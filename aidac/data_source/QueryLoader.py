@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 TEMPLATE_PATH = 'template.yaml'
-cur = Path(__file__, '../..').resolve()
+cur = Path(__file__, '..').resolve()
 __location__ = cur.joinpath(TEMPLATE_PATH)
 
 
