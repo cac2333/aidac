@@ -59,7 +59,9 @@ class LocalTable(DataFrame):
         return LocalTable(self._data_.filter(items=exp, axis=axis))
 
     def aggregate(self, projcols, groupcols=None):
-        pass
+        df_proj = self._data_.filter(projcols)
+        df_group = df_proj.groupby(groupcols)
+        return LocalTable(df_group)
 
     def project(self, cols: Union[List, str]):
         # if isinstance(cols, list):
