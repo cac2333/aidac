@@ -49,5 +49,13 @@ class DataSource:
         """
         pass
 
+    def cardinality(self, table:str):
+        """
+        Get the cardinality as row count and column count
+        @param table:
+        @return: (# row, # col)
+        """
+        pass
+
 
 

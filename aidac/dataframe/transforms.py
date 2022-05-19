@@ -4,7 +4,7 @@ import collections
 import copy
 import weakref
 
-from aidac.dataframe import DataFrame
+from aidac.dataframe import frame
 from aidac.common.column import Column
 
 
@@ -15,6 +15,11 @@ class Transform:
     @property
     def genSQL(self):
         pass
+
+    def sources(self):
+        pass
+
+    def multi_source(self) -> bool: pass
 
 
 class TableTransform(Transform):
@@ -128,3 +133,6 @@ class SQLProjectionTransform(SQLTransform):
                    )
 
         return sql_text
+
+    def multi_source(self) -> bool:
+        return False

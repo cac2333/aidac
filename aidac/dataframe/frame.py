@@ -9,9 +9,13 @@ from aidac.exec.Executable import Executable
 import pandas as pd
 import uuid
 
-import aidac.dataframe.Scheduler as Scheduler
 
+import aidac.dataframe.Scheduler as Scheduler
 sc = Scheduler.Scheduler()
+
+
+def create_remote_table(source, table_name):
+    return RemoteTable(source, table_name=table_name)
 
 
 class DataFrame:
@@ -20,6 +24,8 @@ class DataFrame:
         self.tbl_name = table_name
         self._transform_ = None
         self._columns_ = None
+        self._stubs_ = {}
+        self._data_ = None
 
     @property
     def id(self):
@@ -166,6 +172,9 @@ class DataFrame:
     @abstractmethod
     def cdata(self): pass
 
+class SomeTable(DataFrame):
+    def __init__(self):
+        pass
 
 class RemoteTable(DataFrame):
     def __init__(self, source: DataSource, transform: Transform = None, table_name: str=None):
@@ -179,16 +188,16 @@ class RemoteTable(DataFrame):
 
         self._transform_ = transform
         self._data_ = None
+        self.other_sources = []
 
     @property
     def columns(self):
         if self._columns_ is None:
-            cols = sc.retrieve_meta_data(self)
+            cols = sc.retrieve_columns(self)
             self._columns_ = collections.OrderedDict()
             for col in cols:
                 self._columns_[col.name] = col
         return self._columns_
-
 
     def _link_table_meta(self):
         """
@@ -198,12 +207,12 @@ class RemoteTable(DataFrame):
         pass
 
     def to_string(self):
-        if self.__data__ is None:
-            self._materialize()
+        if self._data_ is None:
+            self.materialize()
 
-    def _materialize(self):
-        pipes = sc.schedule(self)
-        self.__data__ = pipes.process()
+    def materialize(self):
+        self._data_ = sc.schedule(self)
+        return self._data_
 
     def __getitem__(self, key):
         if self._data_ is not None:
@@ -233,3 +242,18 @@ class RemoteTable(DataFrame):
         else:
             return 'SELECT * FROM ' + self.tbl_name
 
+    def add_source(self, ds):
+        self.other_sources.append(ds)
+
+def read_csv(path, delimiter, header) -> LocalTable:
+    df = pd.read_csv(path, delimiter=delimiter, header=header)
+    return LocalTable(df)
+
+
+class LocalTable(DataFrame):
+    def __init__(self, data, table_name=None):
+        super().__init__(table_name)
+        self._data_ = data
+
+    def join(self, other: DataFrame, left_on: list | str, right_on: list | str, join_type: str):
+        pass
