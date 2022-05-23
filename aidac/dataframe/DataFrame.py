@@ -176,8 +176,11 @@ class RemoteTable(DataFrame):
         # try retrieve the meta info of the table from data source
         # if table does not exist, an error will occur
         self._link_table_meta()
+        #
 
         self._transform_ = transform
+        #
+
         self._data_ = None
 
     @property
