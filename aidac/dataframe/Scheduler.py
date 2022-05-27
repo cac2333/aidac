@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from aidac.common.meta import MetaInfo
 import aidac.dataframe.frame as frame
 from aidac.data_source.DataSourceManager import DataSourceManager
-from aidac.exec.Executable import Executable
+from aidac.exec.Executable import Executable, TransferExecutable
 
 
 def _link_tb(df: frame.RemoteTable) -> str | None:
@@ -82,34 +84,52 @@ class Scheduler:
         else:
             assert df.transform is not None
             src_meta = []
+            # if have multiple sources, use the one has the largest cardinality
             for s in df.transform.sources:
-                meta = self._dfs_link_ds(s)
+                meta = self.meta(s)
                 src_meta.append((s, meta))
             opt_ds, opt_meta = self._max_card(src_meta)
 
             ds = self.source_manager.get_data_source(opt_ds)
             assert ds is not None
+            # use parent's datasource
+            # todo: duplicated data over different places
             if df.source is None:
                 df.source = ds
             else:
                 df.add_source(ds)
         return opt_ds, opt_meta
 
-    def transfer_all(self, df: frame.DataFrame):
-        opt_ds,  _ = self._dfs_link_ds(df)
+    def execute(self, df: frame.DataFrame):
+        """
+        materialize the lineage, execute util the data to be transfered to another data source
+        @param df:
+        @return:
+        """
+        def _gen_pipe(df):
+            ex1 = Executable(df)
+            stack = [df]
+            while stack:
+                cur = stack.pop()
+                if cur._data_ is not None:
+                    return ex1
+                else:
+                    assert cur.transform is not None
+                    sources = cur.transform.sources()
+                    for s in sources:
+                        # todo: check if source in the same data source as current
+                        if _link_tb(s, cur.source):
+                            stack.append(s)
+                        else:
+                            # datasources diverge here, create a data transfer node
+                            pex = TransferExecutable(cur)
+                            pex.add_prereq(_gen_pipe(s))
+                            ex1.add_prereq(pex)
+            return ex1
+        self._dfs_link_ds(df)
+        ex = _gen_pipe(df)
+        return ex.process()
 
-    def transfer(self, src: frame.DataFrame, dest: str):
-        """
-        Transfer data from one datasource to another
-        @param src: source table to be transferred
-        @param dest: dataframe whose datasource would be the destination
-        @return: local stub points to the temporary table?
-        """
-        scols = src.columns
-        # todo: check for duplicate names
-        dest.datasource.create_table(src.table_name, scols)
-        dest.datasource.import_table(src.table_name, src.data)
-        # todo: decide if a local stub should be created
 
     def schedule(self, df: frame.DataFrame):
         """
@@ -124,25 +144,26 @@ class Scheduler:
             data = df.source._execute(df.genSQL)
             return data
 
-    def retrieve_columns(self, df: frame.RemoteTable):
-        # todo: solve multiple ds
-        tb_name = _link_tb(df)
-        if tb_name is None:
-            assert df.transform is not None, "A table without a remote table linked to it must have a transform"
-            # materialize column info
-            df.transform.column
-            return None
-        else:
-            return df.source.table_meta_data(tb_name)
+    def meta(self, df: frame.DataFrame):
+        """
+        meta information stored in different data sources should all be the same
+        here just use one data source to estimate the meta information
+        @param df:
+        @return:
+        """
 
-    def meta(self, df: frame.RemoteTable):
-        # todo: solve multiple ds
+        if isinstance(df, frame.LocalTable) or df._data_ is not None:
+            meta = MetaInfo(df.columns, len(df.columns), len(df._data_))
+            return meta
+
         tb_name = _link_tb(df)
         if tb_name is None:
             assert df.transform is not None, "A table without a remote table linked to it must have a transform"
-            # todo, recursively compute the meta info
-            return None
+            # todo: use estimator to decide the meta
+            if isinstance(df.transform.sources(), list):
+                return self.meta(df.transform.sources()[0])
+            return self.meta(df.transform.sources())
         else:
-            nr, nc = df.source.cardinality(tb_name)
-            meta = MetaInfo(df.columns, nc, nr)
+            nr = df.source.row_count(tb_name)
+            meta = MetaInfo(df.columns, len(df.columns), nr)
             return meta

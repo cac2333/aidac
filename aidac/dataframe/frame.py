@@ -27,6 +27,10 @@ class DataFrame:
         self._stubs_ = {}
         self._data_ = None
 
+    def clear_lineage(self):
+        del self._transform_
+        self._transform_ = None
+
     @property
     def id(self):
         return self.__tid__
@@ -172,10 +176,6 @@ class DataFrame:
     @abstractmethod
     def cdata(self): pass
 
-class SomeTable(DataFrame):
-    def __init__(self):
-        pass
-
 class RemoteTable(DataFrame):
     def __init__(self, source: DataSource, transform: Transform = None, table_name: str=None):
         super().__init__(table_name)
@@ -192,12 +192,18 @@ class RemoteTable(DataFrame):
 
     @property
     def columns(self):
-        if self._columns_ is None:
-            cols = sc.retrieve_columns(self)
+        if self.tbl_name is None:
+            assert self.transform is not None, "A table without a remote database table linked to it must have a transform"
+            # materialize column info
+            self._columns_ = self.transform.columns
+        else:
+            cols = self.source.table_columns(self.tbl_name)
             self._columns_ = collections.OrderedDict()
             for col in cols:
                 self._columns_[col.name] = col
         return self._columns_
+
+
 
     def _link_table_meta(self):
         """
@@ -206,9 +212,8 @@ class RemoteTable(DataFrame):
         """
         pass
 
-    def to_string(self):
-        if self._data_ is None:
-            self.materialize()
+    def __str__(self):
+        return self.table_name
 
     def materialize(self):
         self._data_ = sc.schedule(self)
@@ -221,12 +226,12 @@ class RemoteTable(DataFrame):
         if isinstance(key, DataFrame):
             # todo: selection
             pass
-        if isinstance(key, collections.Hashable):
-            keys = [key]
+        if isinstance(key, list):
+            keys = key
         elif isinstance(key, tuple):
             raise ValueError("Multi-level index is not supported")
         else:
-            keys = key
+            keys = [key]
 
         trans = SQLProjectionTransform(self, keys)
         return RemoteTable(self.source, trans)
@@ -234,6 +239,10 @@ class RemoteTable(DataFrame):
     @property
     def transform(self):
         return self._transform_
+
+    @property
+    def table_name(self):
+        return self.tbl_name if self.tbl_name else str(self.__tid__)
 
     @property
     def genSQL(self):

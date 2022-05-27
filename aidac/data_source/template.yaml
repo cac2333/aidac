@@ -7,7 +7,7 @@ list_tables:
 
   monet: |-
 
-table_meta_data:
+table_columns:
   postgres: |-
     SELECT table_schema as schemaName, table_name as tableName, column_name as columnName, data_type as columnType, 
     0 as columnSize, ordinal_position as columnPos, is_nullable as columnNullable

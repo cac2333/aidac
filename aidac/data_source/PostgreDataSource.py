@@ -45,15 +45,15 @@ class PostgreDataSource(DataSource):
             for row in data:
                 copy.write_row(row)
 
-    def table_meta_data(self, table: str):
-        qry = ql.table_meta_data(table)
+    def table_columns(self, table: str):
+        qry = ql.table_columns(table)
         rs = self._execute(qry)
         # expected return value from pd:
         # schemaname, tablename, columnname, columntype, columnsize, columnpos, nullable
         cols = [Column(x[2], typeConverter_rev[x[3]], x[1], x[0], constant_converter[x[-1]]) for x in rs.data]
         return cols
 
-    def cardinality(self, table: str):
+    def row_count(self, table: str):
         """
 
         @param table:
@@ -61,9 +61,7 @@ class PostgreDataSource(DataSource):
         """
         qry = ql.row_card(table)
         rows = self._execute(qry).get_value()
-        qry = ql.column_card(table)
-        columns = self._execute(qry).get_value()
-        return rows, columns
+        return rows
 
     def create_table(self, table_name: str, cols: dict):
         """

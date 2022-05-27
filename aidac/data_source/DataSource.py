@@ -41,7 +41,7 @@ class DataSource:
     def _execute(self, query: str):
         pass
 
-    def table_meta_data(self, table: str):
+    def table_columns(self, table: str):
         """
         Retrieve the column metadata of a table
         @param table:
@@ -49,11 +49,11 @@ class DataSource:
         """
         pass
 
-    def cardinality(self, table:str):
+    def row_count(self, table:str):
         """
-        Get the cardinality as row count and column count
+        Get the row count of a table
         @param table:
-        @return: (# row, # col)
+        @return: # row
         """
         pass
 
