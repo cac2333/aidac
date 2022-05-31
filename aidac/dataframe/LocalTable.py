@@ -392,7 +392,7 @@ class LocalTable(DataFrame):
     '''
     The below methods return Localtable with dataframes of bool
     '''
-
+    ## get data
     def __lt__(self, other:DataFrame):
         return LocalTable(self._data_.__lt__(other.get_data()))
 

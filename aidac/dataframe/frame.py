@@ -27,6 +27,7 @@ class DataFrame:
         self._stubs_ = {}
         self._data_ = None
 
+
     def get_data(self):
         return self._data_
     def clear_lineage(self):
