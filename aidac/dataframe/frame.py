@@ -9,9 +9,13 @@ from aidac.exec.Executable import Executable
 import pandas as pd
 import uuid
 
-import aidac.dataframe.Scheduler as Scheduler
 
+import aidac.dataframe.Scheduler as Scheduler
 sc = Scheduler.Scheduler()
+
+
+def create_remote_table(source, table_name):
+    return RemoteTable(source, table_name=table_name)
 
 
 class DataFrame:
@@ -20,7 +24,12 @@ class DataFrame:
         self.tbl_name = table_name
         self._transform_ = None
         self._columns_ = None
+        self._stubs_ = {}
         self._data_ = None
+
+    def clear_lineage(self):
+        del self._transform_
+        self._transform_ = None
 
     @property
     def id(self):
@@ -34,8 +43,6 @@ class DataFrame:
     def shape(self) -> tuple[int, int]:
         pass
 
-    def get_data(self):
-        return self._data
     @property
     def columns(self):
         if self._columns_ is None:
@@ -169,7 +176,6 @@ class DataFrame:
     @abstractmethod
     def cdata(self): pass
 
-
 class RemoteTable(DataFrame):
     def __init__(self, source: DataSource, transform: Transform = None, table_name: str=None):
         super().__init__(table_name)
@@ -179,21 +185,24 @@ class RemoteTable(DataFrame):
         # try retrieve the meta info of the table from data source
         # if table does not exist, an error will occur
         self._link_table_meta()
-        #
 
         self._transform_ = transform
-        #
-
         self._data_ = None
+        self.other_sources = []
 
     @property
     def columns(self):
-        if self._columns_ is None:
-            cols = sc.retrieve_meta_data(self)
+        if self.tbl_name is None:
+            assert self.transform is not None, "A table without a remote database table linked to it must have a transform"
+            # materialize column info
+            self._columns_ = self.transform.columns
+        else:
+            cols = self.source.table_columns(self.tbl_name)
             self._columns_ = collections.OrderedDict()
             for col in cols:
                 self._columns_[col.name] = col
         return self._columns_
+
 
 
     def _link_table_meta(self):
@@ -203,13 +212,12 @@ class RemoteTable(DataFrame):
         """
         pass
 
-    def to_string(self):
-        if self.__data__ is None:
-            self._materialize()
+    def __str__(self):
+        return self.table_name
 
-    def _materialize(self):
-        pipes = sc.schedule(self)
-        self.__data__ = pipes.process()
+    def materialize(self):
+        self._data_ = sc.schedule(self)
+        return self._data_
 
     def __getitem__(self, key):
         if self._data_ is not None:
@@ -218,12 +226,12 @@ class RemoteTable(DataFrame):
         if isinstance(key, DataFrame):
             # todo: selection
             pass
-        if isinstance(key, collections.Hashable):
-            keys = [key]
+        if isinstance(key, list):
+            keys = key
         elif isinstance(key, tuple):
             raise ValueError("Multi-level index is not supported")
         else:
-            keys = key
+            keys = [key]
 
         trans = SQLProjectionTransform(self, keys)
         return RemoteTable(self.source, trans)
@@ -233,9 +241,28 @@ class RemoteTable(DataFrame):
         return self._transform_
 
     @property
+    def table_name(self):
+        return self.tbl_name if self.tbl_name else str(self.__tid__)
+
+    @property
     def genSQL(self):
         if self.transform is not None:
             return self.transform.genSQL
         else:
             return 'SELECT * FROM ' + self.tbl_name
 
+    def add_source(self, ds):
+        self.other_sources.append(ds)
+
+def read_csv(path, delimiter, header) -> LocalTable:
+    df = pd.read_csv(path, delimiter=delimiter, header=header)
+    return LocalTable(df)
+
+
+class LocalTable(DataFrame):
+    def __init__(self, data, table_name=None):
+        super().__init__(table_name)
+        self._data_ = data
+
+    def join(self, other: DataFrame, left_on: list | str, right_on: list | str, join_type: str):
+        pass

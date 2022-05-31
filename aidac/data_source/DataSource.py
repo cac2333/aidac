@@ -41,11 +41,19 @@ class DataSource:
     def _execute(self, query: str):
         pass
 
-    def table_meta_data(self, table: str):
+    def table_columns(self, table: str):
         """
         Retrieve the column metadata of a table
         @param table:
         @return:
+        """
+        pass
+
+    def row_count(self, table:str):
+        """
+        Get the row count of a table
+        @param table:
+        @return: # row
         """
         pass
 

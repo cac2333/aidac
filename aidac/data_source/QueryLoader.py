@@ -23,13 +23,13 @@ class QueryLoader:
         """
         return self.load_query('list_tables')
 
-    def table_meta_data(self, table_name):
+    def table_columns(self, table_name):
         """
         List table (column) metadata
         @param table_name:
         @return:
         """
-        return self.load_query('table_meta_data').format(table_name)
+        return self.load_query('table_columns').format(table_name)
 
     def create_table(self, table_name, cols_def):
         """
@@ -50,7 +50,7 @@ class QueryLoader:
         return self.load_query('copy_data').format(table_name, col)
 
     def row_card(self, table):
-        return self.load_query('row_number').format(table)
+        return self.load_query('row_num').format(table)
 
     def column_card(self, table):
-        return self.load_query('column_number').format(table)
+        return self.load_query('column_num').format(table)

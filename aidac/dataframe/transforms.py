@@ -3,8 +3,9 @@ from __future__ import annotations
 import collections
 import copy
 import weakref
+from collections.abc import Iterable
 
-from aidac.dataframe import DataFrame
+from aidac.dataframe import frame
 from aidac.common.column import Column
 
 
@@ -15,6 +16,11 @@ class Transform:
     @property
     def genSQL(self):
         pass
+
+    def sources(self):
+        pass
+
+    def multi_source(self) -> bool: pass
 
 
 class TableTransform(Transform):
@@ -29,7 +35,7 @@ class TableTransform(Transform):
 
 # Base class for all SQL Transformations.
 
-def _col_in_source(source: DataFrame, col: Column):
+def _col_in_source(source: frame.DataFrame, col: Column):
     if source.has_transform():
         scols = source._transform_.columns
     else:
@@ -45,7 +51,10 @@ def infer_col_type(cols: Column):
 class SQLTransform(Transform):
     def __init__(self, source):
         self._columns_ = None
-        self._source_ = weakref.proxy(source) if source else None
+        if isinstance(source, Iterable):
+            self._source_ = [weakref.proxy(s) for s in source]
+        else:
+            self._source_ = weakref.proxy(source) if source else None
 
     @property
     # The columns that will be produced once this transform is applied on its source.
@@ -57,6 +66,9 @@ class SQLTransform(Transform):
     # The SQL equivalent of applying this transformation in the database.
     @property
     def genSQL(self): pass
+
+    def sources(self):
+        return self._source_
 
 
 class SQLProjectionTransform(SQLTransform):
@@ -97,10 +109,10 @@ class SQLProjectionTransform(SQLTransform):
                 srccols = []
                 scol = src_cols.get(srccol)
                 if not scol:
-                    raise AttributeError("Cannot locate column {} from {}".format(scol, source))
+                    raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
                 else:
                     srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
-                    sdbtables += (scol.db_tbl if (isinstance(scol.tablename, list)) else [scol.tablename])
+                    sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
 
                 column = Column(projcoln, scol.dtype)
                 column.srccol = srccols
@@ -124,7 +136,10 @@ class SQLProjectionTransform(SQLTransform):
                 col.transform) else col.srccol[0]) + ' AS ' + col.name);
 
         sql_text = ('SELECT ' + projcoltxt + ' FROM '
-                   + '(' + self._source_.genSQL + ') ' + self._source_.tbl_name  # Source table transform SQL.
+                   + '(' + self._source_.genSQL + ') ' + self._source_.table_name # Source table transform SQL.
                    )
 
         return sql_text
+
+    def multi_source(self) -> bool:
+        return False
