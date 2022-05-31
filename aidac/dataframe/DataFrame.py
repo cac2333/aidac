@@ -20,6 +20,7 @@ class DataFrame:
         self.tbl_name = table_name
         self._transform_ = None
         self._columns_ = None
+        self._data_ = None
 
     @property
     def id(self):
@@ -33,6 +34,8 @@ class DataFrame:
     def shape(self) -> tuple[int, int]:
         pass
 
+    def get_data(self):
+        return self._data
     @property
     def columns(self):
         if self._columns_ is None:
