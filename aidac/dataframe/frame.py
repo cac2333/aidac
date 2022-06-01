@@ -176,8 +176,9 @@ class DataFrame:
     @abstractmethod
     def cdata(self): pass
 
+
 class RemoteTable(DataFrame):
-    def __init__(self, source: DataSource, transform: Transform = None, table_name: str=None):
+    def __init__(self, source: DataSource = None, transform: Transform = None, table_name: str=None):
         super().__init__(table_name)
         self.source = source
         self.tbl_name = table_name
@@ -236,6 +237,10 @@ class RemoteTable(DataFrame):
         trans = SQLProjectionTransform(self, keys)
         return RemoteTable(self.source, trans)
 
+    def merge(self, other, on=None, how='left', suffix=('_x', '_y'), sort=False):
+        trans = SQLJoinTransform(self, other, on, on, how, suffix)
+        return RemoteTable(transform=trans)
+
     @property
     def transform(self):
         return self._transform_
@@ -254,8 +259,14 @@ class RemoteTable(DataFrame):
     def add_source(self, ds):
         self.other_sources.append(ds)
 
+
 def read_csv(path, delimiter, header) -> LocalTable:
     df = pd.read_csv(path, delimiter=delimiter, header=header)
+    return LocalTable(df)
+
+
+def from_dict(data):
+    df = pd.DataFrame(data)
     return LocalTable(df)
 
 
@@ -263,6 +274,12 @@ class LocalTable(DataFrame):
     def __init__(self, data, table_name=None):
         super().__init__(table_name)
         self._data_ = data
+        self._stub_ = None
 
-    def join(self, other: DataFrame, left_on: list | str, right_on: list | str, join_type: str):
-        pass
+    def merge(self, other, on=None, how='left', suffix=('_x', '_y'), sort=False):
+        if isinstance(other, LocalTable):
+            return LocalTable(self._data_.merge(other, on, how, suffix=suffix, sort=sort))
+        else:
+            trans = SQLJoinTransform(self, other, on, on, how, suffix)
+            return RemoteTable(transform=trans)
+

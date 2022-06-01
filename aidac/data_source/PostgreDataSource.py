@@ -16,7 +16,8 @@ typeConverter = {np.int8: 'TINYINT', np.int16: 'SMALLINT', np.int32: 'INTEGER', 
     , np.float32: 'FLOAT', np.float64: 'FLOAT', np.object: 'STRING', np.object_: 'STRING', bytearray: 'BLOB'
     , 'date': 'DATE', 'time': 'TIME', 'timestamp': 'TIMESTAMP'};
 
-typeConverter_rev = {'integer': np.int32, 'character varying': np.object, 'double precision': np.float64, 'boolean': bool}
+typeConverter_rev = {'integer': np.int32, 'character varying': np.object, 'double precision': np.float64,
+                     'boolean': bool, 'date': 'date'}
 
 constant_converter = {'YES': True, 'NO': False}
 

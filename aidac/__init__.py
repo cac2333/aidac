@@ -1,13 +1,9 @@
-from aidac.dataframe.frame import create_remote_table, read_csv
+from aidac.dataframe.frame import create_remote_table, read_csv, from_dict
 # from aidac.dataframe.LocalTable import read_csv
 from aidac.dataframe.Scheduler import Scheduler
 from aidac.data_source.DataSourceManager import *
 
 __name__ = 'aidac'
-
-ac = Scheduler()
-manager = DataSourceManager()
-
 
 def add_data_source(source: str, host: str, user: str, password: str, db: str, job_name: str = None, port: str = None):
     manager.add_data_source(source, host, user, password, db, job_name, port)
@@ -23,6 +19,10 @@ def tables():
 
 def read_csv(path, delimiter=None, header=None):
     return read_csv(path, delimiter, header)
+
+
+def from_dict(data):
+    return from_dict(data)
 
 
 def read_remote_data(job: str, table_name: str):

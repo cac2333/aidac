@@ -60,3 +60,4 @@ class DataSourceFactory:
 
 
 data_source_factory = DataSourceFactory()
+manager = DataSourceManager()

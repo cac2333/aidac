@@ -11,6 +11,8 @@ class MyTestCase(unittest.TestCase):
         config = PG_CONFIG
         aidac.add_data_source('postgres', config['host'], config['user'], config['passwd'], config['dbname'], 'p1', config['port'])
         self.station = aidac.read_remote_data('p1', 'station')
+        self.users = aidac.read_remote_data('p1', 'users')
+        self.review = aidac.read_remote_data('p1', 'review')
 
     def test_remote_project1(self):
         proj1 = self.station[['id', 'name', 'longti']]
@@ -22,6 +24,16 @@ class MyTestCase(unittest.TestCase):
         sql2 = proj2.transform.genSQL
         expected = 'SELECT longti AS longti FROM ({})'.format(sql1)
         self.assertRegex(sql2, re.escape(expected))
+
+    def test_remote_join(self):
+        jn = self.users.merge(self.review, 'userid', 'inner')
+        sql = jn.transform.genSQL
+        self.assertEqual(sql, 'SELECT users.userid AS userid_x, users.uname AS uname, users.email AS email, users.dateofbirth AS dateofbirth, '
+                              'review.userid AS userid_y, review.movid AS movid, review.reviewdate AS reviewdate, review.rating AS rating, review.reviewtxt AS reviewtxt '
+                              'FROM (SELECT * FROM users) users INNER JOIN (SELECT * FROM review) review ON users.userid = review.userid')
+        jn.materialize()
+        dd = jn._data_
+        print(dd)
 
     def test_schdule1(self):
         proj = self.station['id']

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from aidac.data_source.DataSourceManager import manager
 from aidac.common.meta import MetaInfo
 import aidac.dataframe.frame as frame
-from aidac.data_source.DataSourceManager import DataSourceManager
 from aidac.exec.Executable import Executable, TransferExecutable
 
 
@@ -28,7 +28,7 @@ def _link_tb(df: frame.RemoteTable) -> str | None:
 class Scheduler:
     def __init__(self):
         self.sources = {}
-        self.source_manager = DataSourceManager()
+        self.source_manager = manager
 
     def _is_local(self, df: frame.DataFrame, ds: str = None) -> bool:
         """
@@ -77,15 +77,15 @@ class Scheduler:
         """
         Link data source at the same time
         @param df:
-        @return:
+        @return: (ds job name, meta)
         """
-        if isinstance(df, frame.LocalTable) or df._data_ is not None or df.transform is not None:
+        if isinstance(df, frame.LocalTable) or df._data_ is not None or df.transform is None:
             return None, self.meta(df)
         else:
             assert df.transform is not None
             src_meta = []
             # if have multiple sources, use the one has the largest cardinality
-            for s in df.transform.sources:
+            for s in df.transform.sources():
                 meta = self.meta(s)
                 src_meta.append((s, meta))
             opt_ds, opt_meta = self._max_card(src_meta)
