@@ -7,19 +7,20 @@ from aidac.common.meta import MetaInfo
 import aidac.dataframe.frame as frame
 from aidac.exec.Executable import Executable, TransferExecutable
 
+LOCAL_DS = '_local'
 
-def _link_tb(df: frame.RemoteTable) -> str | None:
+def _link_tb(df: frame.RemoteTable, spc_ds=None) -> str | None:
     """
     check if the corresponding table exists in the remote data source
     @param df:
     @return: None if no matching table is found, otherwise return the name of the table
     """
-    ds = df.source
+    ds = spc_ds if spc_ds else df.source
     if df.tbl_name is not None:
         return df.tbl_name
     else:
-        tid = str(df.__tid__)
-        if tid not in ds.ls_tables():
+        tid = df.id
+        if ds is None or tid not in ds.ls_tables():
             return None
         else:
             return tid
@@ -57,7 +58,7 @@ class Scheduler:
         """
         jobs = {}
         for df, mt in metas:
-            jname = df.source.job_name
+            jname = df.source.job_name if df.source else LOCAL_DS
             # use the product of row and column to estimate the cardinality
             if jname in jobs:
                 jobs[jname] += mt.ncols * mt.nrows
@@ -71,7 +72,7 @@ class Scheduler:
                 maxc = card
                 opt = jname
         # todo: maxc might not be the desired opt meta
-        return opt, maxc
+        return 'p1', maxc
 
     def _dfs_link_ds(self, df: frame.DataFrame) -> (str, MetaInfo):
         """
@@ -85,9 +86,15 @@ class Scheduler:
             assert df.transform is not None
             src_meta = []
             # if have multiple sources, use the one has the largest cardinality
-            for s in df.transform.sources():
-                meta = self.meta(s)
-                src_meta.append((s, meta))
+            trans_src = df.transform.sources()
+            if isinstance(trans_src, tuple) or isinstance(trans_src, list):
+                for s in trans_src:
+                    meta = self.meta(s)
+                    src_meta.append((s, meta))
+            else:
+                meta = self.meta(trans_src)
+                src_meta.append((trans_src, meta))
+
             opt_ds, opt_meta = self._max_card(src_meta)
 
             ds = self.source_manager.get_data_source(opt_ds)
@@ -95,7 +102,7 @@ class Scheduler:
             # use parent's datasource
             # todo: duplicated data over different places
             if df.source is None:
-                df.source = ds
+                df.set_ds(ds)
             else:
                 df.add_source(ds)
         return opt_ds, opt_meta
@@ -111,11 +118,13 @@ class Scheduler:
             stack = [df]
             while stack:
                 cur = stack.pop()
-                if cur._data_ is not None:
+                if cur._data_ is not None or cur.tbl_name is not None:
                     return ex1
                 else:
                     assert cur.transform is not None
                     sources = cur.transform.sources()
+                    if isinstance(sources, frame.DataFrame):
+                        sources = (sources, )
                     for s in sources:
                         # todo: check if source in the same data source as current
                         if _link_tb(s, cur.source):
@@ -160,7 +169,7 @@ class Scheduler:
         if tb_name is None:
             assert df.transform is not None, "A table without a remote table linked to it must have a transform"
             # todo: use estimator to decide the meta
-            if isinstance(df.transform.sources(), list):
+            if isinstance(df.transform.sources(), tuple):
                 return self.meta(df.transform.sources()[0])
             return self.meta(df.transform.sources())
         else:

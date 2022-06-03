@@ -1,4 +1,7 @@
+import collections
 from collections.abc import Iterable
+
+import numpy as np
 
 
 class ResultSet:
@@ -29,4 +32,22 @@ class ResultSet:
         """
         rs = [x[0] for x in nested]
         return rs
+
+    def get_result_table(self):
+        od = collections.OrderedDict()
+        for idx1, col in enumerate(self.columns):
+            tp = type(self.data[0][idx1])
+            if tp == str:
+                tp = object
+            od[col.name] = np.empty(len(self.data), dtype=tp)
+            for idx2, row in enumerate(self.data):
+                od[col.name][idx2] = row[idx1]
+        return od
+
+
+    def to_pd(self):
+        """
+        convert data and column to pandas
+        @return:
+        """
 

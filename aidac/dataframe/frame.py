@@ -2,6 +2,8 @@ from __future__ import annotations
 from abc import abstractmethod
 import collections
 
+import numpy as np
+
 from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource
 from aidac.dataframe.transforms import *
@@ -20,10 +22,11 @@ def create_remote_table(source, table_name):
 
 class DataFrame:
     def __init__(self, table_name=None):
-        self.__tid__ = uuid.uuid4()
+        self.__tid__ = 't_'+uuid.uuid4().hex
         self.tbl_name = table_name
         self._transform_ = None
         self._columns_ = None
+        self._source_ = None
         self._stubs_ = {}
         self._data_ = None
 
@@ -31,13 +34,16 @@ class DataFrame:
         del self._transform_
         self._transform_ = None
 
+    def set_ds(self, ds):
+        self._source_ = ds
+
     @property
     def id(self):
         return self.__tid__
 
     @property
     def table_name(self):
-        return self.tbl_name
+        return self.tbl_name if self.tbl_name else self.__tid__
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -49,9 +55,15 @@ class DataFrame:
             cols = {}
             # create columns using pandas index column name and types
             for cname, ctype in zip(self._data_.dtypes.index, self._data_.dtypes):
+                if isinstance(ctype, np.dtype):
+                    ctype = ctype.type
                 cols[cname] = Column(cname, ctype)
             return cols
         return self._columns_
+
+    @property
+    def source(self):
+        return self._source_
 
     def __repr__(self) -> str:
         """
@@ -173,14 +185,14 @@ class DataFrame:
     def tail(self,n=5): pass
 
     @property
-    @abstractmethod
-    def cdata(self): pass
+    def data(self):
+        return self._data_
 
 
 class RemoteTable(DataFrame):
     def __init__(self, source: DataSource = None, transform: Transform = None, table_name: str=None):
         super().__init__(table_name)
-        self.source = source
+        self._source_ = source
         self.tbl_name = table_name
 
         # try retrieve the meta info of the table from data source
@@ -217,7 +229,7 @@ class RemoteTable(DataFrame):
         return self.table_name
 
     def materialize(self):
-        self._data_ = sc.schedule(self)
+        self._data_ = sc.execute(self)
         return self._data_
 
     def __getitem__(self, key):
@@ -247,14 +259,14 @@ class RemoteTable(DataFrame):
 
     @property
     def table_name(self):
-        return self.tbl_name if self.tbl_name else str(self.__tid__)
+        return self.tbl_name if self.tbl_name else self.__tid__
 
     @property
     def genSQL(self):
         if self.transform is not None:
             return self.transform.genSQL
         else:
-            return 'SELECT * FROM ' + self.tbl_name
+            return 'SELECT * FROM ' + self.table_name
 
     def add_source(self, ds):
         self.other_sources.append(ds)
@@ -275,6 +287,10 @@ class LocalTable(DataFrame):
         super().__init__(table_name)
         self._data_ = data
         self._stub_ = None
+
+    @property
+    def genSQL(self):
+        return 'SELECT * FROM ' + self.table_name
 
     def merge(self, other, on=None, how='left', suffix=('_x', '_y'), sort=False):
         if isinstance(other, LocalTable):

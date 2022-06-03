@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pandas as pd
+
+from aidac.common.DataIterator import generator
 from aidac.dataframe import frame
 
 
@@ -13,15 +16,23 @@ class Executable:
         Need to process all prerequisites and update the lineage
         @return:
         """
+        if isinstance(self.df, frame.LocalTable):
+            return self.df.data
+
         for x in self.prereqs:
             x.process()
-            x.table.clear_lineage()
-        sql = self.table.genSQL
-        rs = self.table.datasource._execute(sql)
-        return rs
+            x.clear_lineage()
+        sql = self.df.genSQL
+        rs = self.df.source._execute(sql)
+
+        data = rs.get_result_table()
+        return pd.DataFrame(data)
 
     def add_prereq(self, other:Executable):
         self.prereqs.append(other)
+
+    def clear_lineage(self):
+        self.df.clear_lineage()
 
 
 class TransferExecutable(Executable):
@@ -38,8 +49,8 @@ class TransferExecutable(Executable):
         """
         scols = src.columns
         # todo: check for duplicate names
-        dest.datasource.create_table(src.table_name, scols)
-        dest.datasource.import_table(src.table_name, src.data)
+        dest.source.create_table(src.table_name, scols)
+        dest.source.import_table(src.table_name, scols, generator(src.data))
         # todo: decide if a local stub should be created
 
     def process(self):
@@ -50,7 +61,10 @@ class TransferExecutable(Executable):
         for x in self.prereqs:
             x.process()
 
-        self.transfer(x.table, self.target)
+        self.transfer(x.df, self.target)
 
     def add_prereq(self, other: Executable):
         self.prereqs.append(other)
+
+    def clear_lineage(self):
+        return

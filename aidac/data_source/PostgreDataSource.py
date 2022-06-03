@@ -1,18 +1,23 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas
 
 from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource
 from aidac.data_source.QueryLoader import QueryLoader
 import psycopg
+from psycopg2.extensions import register_adapter, AsIs
 
 from aidac.data_source.ResultSet import ResultSet
 
 DS = 'postgres'
 ql = QueryLoader(DS)
 
-typeConverter = {np.int8: 'TINYINT', np.int16: 'SMALLINT', np.int32: 'INTEGER', np.int64: 'BIGINT'
+register_adapter(np.int32, AsIs)
+register_adapter(np.int64, AsIs)
+
+typeConverter = {np.int8: 'TINYINT', np.int16: 'SMALLINT', np.int32: 'INT', np.int64: 'BIGINT'
     , np.float32: 'FLOAT', np.float64: 'FLOAT', np.object: 'STRING', np.object_: 'STRING', bytearray: 'BLOB'
     , 'date': 'DATE', 'time': 'TIME', 'timestamp': 'TIMESTAMP'};
 
@@ -72,8 +77,8 @@ class PostgreDataSource(DataSource):
         @return: in db column definition
         """
         col_def = []
-        for cname, ctype in cols.items():
-            db_type = typeConverter[ctype]
+        for cname, col in cols.items():
+            db_type = typeConverter[col.dtype]
             col_def.append(str(cname)+' '+db_type)
         col_def = ', '.join(col_def)
 
@@ -85,6 +90,7 @@ class PostgreDataSource(DataSource):
         self.__cursor.execute(qry)
         if self.__cursor.description is not None:
             # as no record returned for insert, update queries
+            # todo: change column type here
             rs = ResultSet(self.__cursor.description, self.__cursor.fetchall())
             return rs
         return None
