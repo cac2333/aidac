@@ -9,17 +9,19 @@ import re
 from pandas._libs.lib import NoDefault
 
 from aidac.common.column import Column
-from aidac.dataframe.frame import DataFrame
+from aidac.dataframe import DataFrame
 
 
 # TODO: add compatible for other DataFrame types
-# TODO: distinct() / preview_lineage() /
+
 class LocalTable(DataFrame):
     def __init__(self, data: pd.DataFrame, table_name=None):
         super().__init__(table_name)
         self._data_ = data
         self._stub_ = None
 
+    def get_data(self):
+        return self._data_.copy(True)
     @classmethod
     def read_csv(cls, path, delimiter, header) -> LocalTable:
         df = pd.read_csv(path, delimiter=delimiter, header=header)
@@ -162,15 +164,15 @@ class LocalTable(DataFrame):
     def isin(self, values):
         return LocalTable(self._data_.isin(values))
 
-    def where(self, cond, other=NoDefault.no_default, inplace=False, axis=None, level=None, errors='raise',
+    def where(self, cond, other:DataFrame, inplace=False, axis=None, level=None, errors='raise',
               try_cast=NoDefault.no_default):
-        return self._data_.where(cond, other, inplace, axis, level, errors, try_cast)
+        return self._data_.where(cond, other.get_data(), inplace, axis, level, errors, try_cast)
 
-    def align(self, other, join='outer', axis=None, level=None, copy=True, fill_value=None, method=None, limit=None,
+    def align(self, other:DataFrame, join='outer', axis=None, level=None, copy=True, fill_value=None, method=None, limit=None,
               fill_axis=0,
               broadcast_axis=None):
         return LocalTable(
-            self._data_.align(other, join, axis, level, copy, fill_value, method, limit, fill_axis, broadcast_axis))
+            self._data_.align(other.get_data(), join, axis, level, copy, fill_value, method, limit, fill_axis, broadcast_axis))
 
     def at_time(self, time, asof=False, axis=None):
         return LocalTable(self._data_.at_time(time, asof, axis))
@@ -189,7 +191,7 @@ class LocalTable(DataFrame):
         return self._data_.duplicated(subset, keep)
 
     def equals(self, other):
-        return self._data_.equals(other)
+        return self._data_.equals(other.get_data())
 
     def first(self, offset):
         return LocalTable(self._data_.first(offset))
@@ -367,7 +369,7 @@ class LocalTable(DataFrame):
         return LocalTable(self._data_.merge(right, how, on, left_on, right_on, left_index, right_index, sort, suffixes, copy, indicator, validate))
 
     def update(self, other, join='left', overwrite=True, filter_func=None, errors='ignore'):
-        self._data_.update(other, join, overwrite, filter_func, errors)
+        self._data_.update(other.get_data, join, overwrite, filter_func, errors)
 
     def attrs(self):
         return self._data_.attrs
@@ -390,56 +392,56 @@ class LocalTable(DataFrame):
     '''
     The below methods return Localtable with dataframes of bool
     '''
+    ## get data
+    def __lt__(self, other:DataFrame):
+        return LocalTable(self._data_.__lt__(other.get_data()))
 
-    def __lt__(self, other):
-        return LocalTable(self._data_.__lt__(other))
+    def __gt__(self, other:DataFrame):
+        return LocalTable(self._data_.__gt__(other.get_data()))
 
-    def __gt__(self, other):
-        return LocalTable(self._data_.__gt__(other))
+    def __le__(self, other:DataFrame):
+        return LocalTable(self._data_.__le__(other.get_data()))
 
-    def __le__(self, other):
-        return LocalTable(self._data_.__le__(other))
+    def __ge__(self, other:DataFrame):
+        return LocalTable(self._data_.__ge__(other.get_data()))
 
-    def __ge__(self, other):
-        return LocalTable(self._data_.__ge__(other))
+    def __ne__(self, other:DataFrame):
+        return LocalTable(self._data_.__ne__(other.get_data()))
 
-    def __ne__(self, other):
-        return LocalTable(self._data_.__ne__(other))
-
-    def __eq__(self, other):
-        return LocalTable(self._data_.__eq__(other))
+    def __eq__(self, other:DataFrame):
+        return LocalTable(self._data_.__eq__(other.get_data()))
 
     #####################################
 
-    def __add__(self, other):
+    def __add__(self, other:DataFrame):
         if isinstance(other, LocalTable):
             return LocalTable(self._data_.__add__(other._data_))
 
     def __radd__(self, other):
         if isinstance(other, LocalTable):
-            return self.__add__(other)
+            return self.__add__(other.get_data())
 
-    def __mul__(self, other):
+    def __mul__(self, other:DataFrame):
         if isinstance(other, LocalTable):
             return LocalTable(self._data_.__mul__(other._data_))
 
-    def __rmul__(self, other):
+    def __rmul__(self, other:DataFrame):
         if isinstance(other, LocalTable):
-            return self.__mul__(other)
+            return self.__mul__(other._data_)
 
-    def __sub__(self, other):
+    def __sub__(self, other:DataFrame):
         if isinstance(other, LocalTable):
             return LocalTable(self._data_.__sub__(other._data_))
 
-    def __rsub__(self, other):
+    def __rsub__(self, other:DataFrame):
         if isinstance(other, LocalTable):
             return LocalTable(other._data_.__sub__(self._data_))
 
-    def __truediv__(self, other):
+    def __truediv__(self, other:DataFrame):
         if isinstance(other, LocalTable):
             return LocalTable(self._data_.__truediv__(other._data_))
 
-    def __rtruediv__(self, other):
+    def __rtruediv__(self, other:DataFrame):
         if isinstance(other, LocalTable):
             return LocalTable(other._data_.__truediv__(self._data_))
 
@@ -448,11 +450,11 @@ class LocalTable(DataFrame):
             return LocalTable(self._data_ ** power)
         return LocalTable(self._data_ ** power % modulo)
 
-    def __matmul__(self, other):
+    def __matmul__(self, other:DataFrame):
         if isinstance(other, LocalTable):
             return LocalTable(self._data_.__matmul__(other._data_))
 
-    def __rmatmul__(self, other):
+    def __rmatmul__(self, other:DataFrame):
         if isinstance(other, LocalTable):
             return LocalTable(other._data_.__matmul__(self._data_))
 
@@ -460,18 +462,18 @@ class LocalTable(DataFrame):
     def T(self):
         return LocalTable(self._data_.T)
 
-    def compare(self, other, align_axis=1, keep_shape=False, keep_equal=False):
-        return LocalTable(self._data_.compare(other, align_axis, keep_shape, keep_equal))
+    def compare(self, other:DataFrame, align_axis=1, keep_shape=False, keep_equal=False):
+        return LocalTable(self._data_.compare(other.get_data(), align_axis, keep_shape, keep_equal))
 
-    def join(self, other, on=None, how='left', lsuffix='', rsuffix='', sort=False):
-        return LocalTable(self._data_.join(other, on, how, lsuffix, rsuffix, sort))
+    def join(self, other:DataFrame, on=None, how='left', lsuffix='', rsuffix='', sort=False):
+        return LocalTable(self._data_.join(other.get_data(), on, how, lsuffix, rsuffix, sort))
 
 
-    def combine(self, other, func, fill_value=None, overwrite=True):
-        return LocalTable(self._data_.combine(other, func, fill_value, overwrite))
+    def combine(self, other:DataFrame, func, fill_value=None, overwrite=True):
+        return LocalTable(self._data_.combine(other.get_data(), func, fill_value, overwrite))
 
-    def combine_first(self, other):
-        return LocalTable(self._data_.combine_first(other))
+    def combine_first(self, other:DataFrame):
+        return LocalTable(self._data_.combine_first(other.get_data()))
 
     def __getitem__(self, item):
         return LocalTable(self._data_.__getitem__(item))
@@ -512,11 +514,11 @@ class LocalTable(DataFrame):
     def count(self, axis=0, level=None, numeric_only=False):
         return LocalTable(self._data_.count(axis, level, numeric_only))
 
-    def mod(self, other, axis='columns', level=None, fill_value=None):
-        return LocalTable(self._data_.__mod__(other, axis, level, fill_value))
+    def mod(self, other:DataFrame, axis='columns', level=None, fill_value=None):
+        return LocalTable(self._data_.__mod__(other.get_data(), axis, level, fill_value))
 
     def dot(self, other):
-        return LocalTable(self._data_.dot(other))
+        return LocalTable(self._data_.dot(other.get_data()))
 
     def abs(self):
         return LocalTable(self._data_.abs())
