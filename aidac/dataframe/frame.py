@@ -234,6 +234,50 @@ class RemoteTable(DataFrame):
     def materialize(self):
         self._data_ = sc.execute(self)
         return self._data_
+    
+        def fillna(self, col, val):
+        transform = SQLFillNA(self, col, val)
+        return RemoteTable(self.source, transform)
+
+    def dropna(self, col):
+        transform = SQLDropNA(self, col)
+        return RemoteTable(self.source, transform)
+
+    def drop_duplicates(self):
+        transform = SQLDropduplicateTransform(self)
+        return RemoteTable(self.source, transform)
+
+    
+
+    def order(self, orderlist: Union[List[str], str]):
+
+        if isinstance(orderlist, str):
+            keys = [orderlist]
+        else:
+            if not orderlist:
+                raise ValueError("orderlist cannot be None!")
+            keys = orderlist
+
+        transform = SQLOrderTransform(self, keys)
+        return RemoteTable(self.source, transform)
+
+    def groupby(self, by: Union[List[str], str], groupcols: Union[List[str], str, None]):
+        if isinstance(by, str):
+            by_ = [by]
+        else:
+            if not by:
+                raise ValueError("by cannot be empty!")
+            by_ = by
+
+        if isinstance(groupcols, str):
+            groupcols_ = [groupcols]
+        else:
+            if not groupcols:
+                groupcols_ = None
+            else:
+                groupcols_ = groupcols
+        transform = SQLGroupByTransform(self, by_, groupcols_)
+        return RemoteTable(self.source, transform)
 
     def __getitem__(self, key):
         if self._data_ is not None:
