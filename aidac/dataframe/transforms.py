@@ -161,8 +161,8 @@ class SQLJoinTransform(SQLTransform):
         if(not(join == 'cross') and len(src1joincols) != len(src2joincols)):
             raise AttributeError('src1joincols and src2joincols should have same number columns');
 
-        self._source1_      = weakref.proxy(source1)
-        self._source2_      = weakref.proxy(source2)
+        self._source1_ = weakref.proxy(source1)
+        self._source2_ = weakref.proxy(source2)
         self._source_ = (self._source1_, self._source2_)
         self._src1joincols_ = src1joincols
         self._src2joincols_ = src2joincols
@@ -228,3 +228,172 @@ class SQLJoinTransform(SQLTransform):
                     )
 
         return sqlText
+class SQLOrderTransform(SQLTransform):
+
+    # order does not reformat the columns
+    def __init__(self, source, orderlist):
+        super().__init__(source)
+
+        self._order_ = orderlist
+
+    def _gen_column(self, source):
+        pass
+    #   df.order(by = ...)
+
+    #
+    # def execute_source(self):
+    #     pass
+
+    @property
+    def columns(self):
+        if not self._columns_:
+            self._gen_column(self._source_)
+        return self.columns
+
+    @property
+    def genSQL(self):
+
+        srccols = self._source_.columns
+        ordered_col = [self._order_] if isinstance(self._order_, str) else self._order_
+
+        sql_text = 'ORDER BY '
+
+        key_res = ''
+        sort_order = ''
+        print(ordered_col)
+        for key_ in range(len(ordered_col)):
+            key = ordered_col[key_]
+            if key.endswith("#asc"):
+                key_res = key[:-4]
+                sort_order = 'asc'
+            elif key.endswith("#desc"):
+                key_res = key[:-5]
+                sort_order = 'desc'
+            else:
+                key_res = key
+                sort_order = 'asc'
+            sql_text += key_res + ' ' + sort_order + ' '
+        return self._source_.genSQL + ' ' + sql_text
+
+
+class SQLGroupByTransform(SQLTransform):
+    def __init__(self, source, projectcols, groupcols = None):
+        super().__init__(source)
+        self._projectcols_ = projectcols
+        self._groupcols_ = groupcols
+
+    def _gen_column(self, source):
+        pass
+
+    def execute_source(self):
+        pass
+
+
+    @property
+    def columns(self):
+        if not self._columns_:
+            self._gen_column(self._source_)
+        return self.columns
+
+    @property
+    def genSQL(self):
+        projcoltxt = None
+        for c in self.columns:  # Prepare the list of columns going into the select statement.
+            col = self.columns[c]
+
+            projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + ((col.transform.genSQL if (
+                col.transform) else col.srccol[0]) + ' AS ' + col.name)
+
+        groupcoltxt = None
+        if self._groupcols_:
+            for g in self._groupcols_:
+                groupcoltxt = ((groupcoltxt + ', ') if (groupcoltxt) else '') + g
+
+        sqlText = ('SELECT ' + projcoltxt + ' FROM '
+                   + '(' + self._source_.genSQL.sqlText + ') ' + self._source_.table_name  # Source table transform SQL.
+                   + ((' GROUP BY ' + groupcoltxt) if (groupcoltxt) else '')
+                   )
+        return sqlText
+
+class SQLFillNA(SQLTransform):
+    def __init__(self, source, col, val):
+        super().__init__(source)
+        self._col_to_fill = col # if col length is 0, fill all columns
+        self._target_val_ = val # if val is None, fill with 0
+
+    def columns(self):
+        if not self._columns_:
+            self._gen_column(self._source_)
+        return self.columns
+
+    def _gen_column(self, _source_):
+        pass
+
+    def genSQL(self):
+
+
+class SQLDropduplicateTransform(SQLTransform):
+    def __init__(self, source):
+        super().__init__(source)
+
+    @property
+    def columns(self):
+        if not self._columns_:
+            self._gen_column(self._source_)
+        return self.columns
+
+    def genSQL(self):
+        projcoltxt = None
+
+        for c in self.columns:
+            col = self.columns[c] # generate the column name
+            projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + col.name
+
+        sqlText = ('SELECT DISTINCT ' + projcoltxt + ' FROM '
+                   + '(' + self._source_.genSQL.sqlText + ') ' + self._source_.table_name  # Source table transform SQL.
+                   )
+        return sqlText
+
+    def _gen_column(self, _source_):
+
+        pass
+
+
+class SQLDropNA(SQLTransform):
+    def __init__(self, source, cols):
+        super().__init__(source)
+        self._targetcols_ = cols
+
+    def _gen_column(self, source):
+        pass
+
+    @property
+    def columns(self):
+        if not self._columns_:
+            self._gen_column(self._source_)
+        return self.columns
+
+    def genSQL(self):
+        sql_text = f'DELETE FROM {self._source_.table_name} where '
+
+        target_col = [self._targetcols_] if isinstance(self._targetcols_, str) else self._targetcols_
+
+        if len(target_col) == 1:
+            sql_text = sql_text + target_col[0] + 'is NULL;'
+            return sql_text
+        else:
+            if len(target_col) == 0:
+                for c in self.columns:
+                    colname = self.columns[c]
+                    sql_text = sql_text + colname + 'is NULL OR '
+
+                sql_text = sql_text[:-4]
+                sql_text = sql_text + ";"
+                return sql_text
+
+            for colname in self._targetcols_:
+                sql_text = sql_text + colname + "is NULL OR "
+
+            sql_text = sql_text[:-4]
+            sql_text = sql_text + ";"
+            return sql_text

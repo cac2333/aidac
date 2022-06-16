@@ -17,6 +17,10 @@ class ResultSet:
         return self._flatten(self.data)
 
     def get_value(self):
+        """
+        get the first result tuple
+        @return:
+        """
         rs = self.data[0][0]
         return rs
 

@@ -4,3 +4,7 @@
 
 ### DataSource
 * load_table(): create  
+
+
+does pandas generate histgram when generating index 
+global scheduler 

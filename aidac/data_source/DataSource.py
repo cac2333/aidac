@@ -57,5 +57,18 @@ class DataSource:
         """
         pass
 
+    def retrieve_table(self, table_name:str):
+        pass
+
+    def get_hist(self, table_name:str, column_name:str):
+        pass
+
+
+class LocalDataSource(DataSource):
+    def __init__(self):
+        self.job_name = '_local_ds'
+
+
+local_ds = LocalDataSource()
 
 

@@ -3,9 +3,10 @@ from abc import abstractmethod
 import collections
 
 import numpy as np
+from typing import Union, List
 
 from aidac.common.column import Column
-from aidac.data_source.DataSource import DataSource
+from aidac.data_source.DataSource import DataSource, local_ds
 from aidac.dataframe.transforms import *
 from aidac.exec.Executable import Executable
 import pandas as pd
@@ -23,22 +24,22 @@ def create_remote_table(source, table_name):
 class DataFrame:
     def __init__(self, table_name=None):
         self.__tid__ = 't_'+uuid.uuid4().hex
-        self.tbl_name = table_name
+        self.source_table = table_name
         self._transform_ = None
         self._columns_ = None
-        self._source_ = None
-        self._stubs_ = {}
+        self._ds_ = None
+        self._stubs_ = []
         self._data_ = None
-
 
     def get_data(self):
         return self._data_
+
     def clear_lineage(self):
         del self._transform_
         self._transform_ = None
 
     def set_ds(self, ds):
-        self._source_ = ds
+        self._ds_ = ds
 
     @property
     def id(self):
@@ -46,11 +47,15 @@ class DataFrame:
 
     @property
     def table_name(self):
-        return self.tbl_name if self.tbl_name else self.__tid__
+        return self.source_table if self.source_table else self.__tid__
 
     @property
     def shape(self) -> tuple[int, int]:
         pass
+
+    @property
+    def transform(self):
+        return self._transform_
 
     @property
     def columns(self):
@@ -66,7 +71,7 @@ class DataFrame:
 
     @property
     def source(self):
-        return self._source_
+        return self._ds_
 
     def __repr__(self) -> str:
         """
@@ -79,7 +84,7 @@ class DataFrame:
 
     @abstractmethod
     def join(self, other: DataFrame, left_on: list | str, right_on: list | str, join_type: str):
-        sc.schedule(self)
+        pass
         """
         May involve mixed data source
         """
@@ -195,8 +200,8 @@ class DataFrame:
 class RemoteTable(DataFrame):
     def __init__(self, source: DataSource = None, transform: Transform = None, table_name: str=None):
         super().__init__(table_name)
-        self._source_ = source
-        self.tbl_name = table_name
+        self._ds_ = source
+        self.source_table = table_name
 
         # try retrieve the meta info of the table from data source
         # if table does not exist, an error will occur
@@ -204,19 +209,20 @@ class RemoteTable(DataFrame):
 
         self._transform_ = transform
         self._data_ = None
-        self.other_sources = []
+        self.other_ds = []
 
     @property
     def columns(self):
-        if self.tbl_name is None:
-            assert self.transform is not None, "A table without a remote database table linked to it must have a transform"
-            # materialize column info
-            self._columns_ = self.transform.columns
-        else:
-            cols = self.source.table_columns(self.tbl_name)
-            self._columns_ = collections.OrderedDict()
-            for col in cols:
-                self._columns_[col.name] = col
+        if not self._columns_:
+            if self.source_table is None:
+                assert self.transform is not None, "A table without a remote database table linked to it must have a transform"
+                # materialize column info
+                self._columns_ = self.transform.columns
+            else:
+                cols = self.source.table_columns(self.source_table)
+                self._columns_ = collections.OrderedDict()
+                for col in cols:
+                    self._columns_[col.name] = col
         return self._columns_
 
 
@@ -234,6 +240,50 @@ class RemoteTable(DataFrame):
     def materialize(self):
         self._data_ = sc.execute(self)
         return self._data_
+    
+    def fillna(self, col, val):
+        transform = SQLFillNA(self, col, val)
+        return RemoteTable(self.source, transform)
+
+    def dropna(self, col):
+        transform = SQLDropNA(self, col)
+        return RemoteTable(self.source, transform)
+
+    def drop_duplicates(self):
+        transform = SQLDropduplicateTransform(self)
+        return RemoteTable(self.source, transform)
+
+    
+
+    def order(self, orderlist: Union[List[str], str]):
+
+        if isinstance(orderlist, str):
+            keys = [orderlist]
+        else:
+            if not orderlist:
+                raise ValueError("orderlist cannot be None!")
+            keys = orderlist
+
+        transform = SQLOrderTransform(self, keys)
+        return RemoteTable(self.source, transform)
+
+    def groupby(self, by: Union[List[str], str], groupcols: Union[List[str], str, None]):
+        if isinstance(by, str):
+            by_ = [by]
+        else:
+            if not by:
+                raise ValueError("by cannot be empty!")
+            by_ = by
+
+        if isinstance(groupcols, str):
+            groupcols_ = [groupcols]
+        else:
+            if not groupcols:
+                groupcols_ = None
+            else:
+                groupcols_ = groupcols
+        transform = SQLGroupByTransform(self, by_, groupcols_)
+        return RemoteTable(self.source, transform)
 
     def __getitem__(self, key):
         if self._data_ is not None:
@@ -252,17 +302,16 @@ class RemoteTable(DataFrame):
         trans = SQLProjectionTransform(self, keys)
         return RemoteTable(self.source, trans)
 
-    def merge(self, other, on=None, how='left', suffix=('_x', '_y'), sort=False):
-        trans = SQLJoinTransform(self, other, on, on, how, suffix)
+    def merge(self, other, on=None, left_on=None, right_on=None, how='left', suffix=('_x', '_y'), sort=False):
+        if left_on and right_on:
+            trans = SQLJoinTransform(self, other, left_on, right_on, how, suffix)
+        else:
+            trans = SQLJoinTransform(self, other, on, on, how, suffix)
         return RemoteTable(transform=trans)
 
     @property
-    def transform(self):
-        return self._transform_
-
-    @property
     def table_name(self):
-        return self.tbl_name if self.tbl_name else self.__tid__
+        return self.source_table if self.source_table else self.__tid__
 
     @property
     def genSQL(self):
@@ -275,8 +324,8 @@ class RemoteTable(DataFrame):
         self.other_sources.append(ds)
 
 
-def read_csv(path, delimiter, header) -> LocalTable:
-    df = pd.read_csv(path, delimiter=delimiter, header=header)
+def read_csv(path, delimiter, header, names) -> LocalTable:
+    df = pd.read_csv(path, delimiter=delimiter, header=header, names=names)
     return LocalTable(df)
 
 
@@ -289,16 +338,22 @@ class LocalTable(DataFrame):
     def __init__(self, data, table_name=None):
         super().__init__(table_name)
         self._data_ = data
-        self._stub_ = None
+        self._ds_ = local_ds
+        self._stubs_ = []
 
     @property
     def genSQL(self):
         return 'SELECT * FROM ' + self.table_name
 
-    def merge(self, other, on=None, how='left', suffix=('_x', '_y'), sort=False):
+    def merge(self, other, on=None, left_on=None, right_on=None, how='left', suffix=('_x', '_y'), sort=False):
         if isinstance(other, LocalTable):
-            return LocalTable(self._data_.merge(other, on, how, suffix=suffix, sort=sort))
+            return LocalTable(self._data_.merge(other, on, how, left_on=left_on, right_on=right_on,
+                                                suffix=suffix, sort=sort))
         else:
-            trans = SQLJoinTransform(self, other, on, on, how, suffix)
+            if left_on and right_on:
+                trans = SQLJoinTransform(self, other, left_on, right_on, how, suffix)
+            else:
+                trans = SQLJoinTransform(self, other, on, on, how, suffix)
             return RemoteTable(transform=trans)
+
 

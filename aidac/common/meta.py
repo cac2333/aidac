@@ -6,4 +6,6 @@ class MetaInfo:
         self.cols = cols
         if cols:
             self.ncols = len(cols)
+        else:
+            self.ncols = ncols
         self.nrows = nrows

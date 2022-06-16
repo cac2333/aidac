@@ -18,7 +18,7 @@ class LocalTable(DataFrame):
     def __init__(self, data: pd.DataFrame, table_name=None):
         super().__init__(table_name)
         self._data_ = data
-        self._stub_ = None
+        self._stubs_ = None
 
     def get_data(self):
         return self._data_.copy(True)

@@ -1,13 +1,14 @@
 import uuid
 
-from aidac.data_source.DataSource import DataSource
+from aidac.data_source.DataSource import DataSource, local_ds
 from aidac.data_source.PostgreDataSource import PostgreDataSource
 from aidac.data_source.exceptions import DataSourceException
 
+LOCAL_DS = '_local_ds'
 
 class DataSourceManager:
     def __init__(self):
-        self.sources = {}
+        self.sources = {local_ds.job_name: local_ds}
 
     def add_data_source(self, source: str, host: str, user: str, password: str, db: str, job_name: str, port: str):
         """

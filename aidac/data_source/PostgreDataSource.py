@@ -18,11 +18,11 @@ register_adapter(np.int32, AsIs)
 register_adapter(np.int64, AsIs)
 
 typeConverter = {np.int8: 'TINYINT', np.int16: 'SMALLINT', np.int32: 'INT', np.int64: 'BIGINT'
-    , np.float32: 'FLOAT', np.float64: 'FLOAT', np.object: 'STRING', np.object_: 'STRING', bytearray: 'BLOB'
+    , np.float32: 'FLOAT', np.float64: 'FLOAT', np.object: 'VARCHAR(100)', np.object_: 'VARCHAR(100)', bytearray: 'BLOB'
     , 'date': 'DATE', 'time': 'TIME', 'timestamp': 'TIMESTAMP'};
 
 typeConverter_rev = {'integer': np.int32, 'character varying': np.object, 'double precision': np.float64,
-                     'boolean': bool, 'date': 'date'}
+                     'boolean': bool, 'date': 'date', 'timestamp without time zone': 'timestamp'}
 
 constant_converter = {'YES': True, 'NO': False}
 
@@ -46,10 +46,13 @@ class PostgreDataSource(DataSource):
     def import_table(self, table: str, cols: dict, data):
         # todo: allow to specify the columns to be inserted, maybe also create a col object for cols
         # todo: right now data iterate rows, rooms for optimization later
+        import time
+        start = time.time()
         column_name = ', '.join(list(cols.keys()))
         with self.__cursor.copy(ql.copy_data(table, column_name)) as copy:
             for row in data:
                 copy.write_row(row)
+        print(start-time.time())
 
     def table_columns(self, table: str):
         qry = ql.table_columns(table)
@@ -85,6 +88,16 @@ class PostgreDataSource(DataSource):
         qry = ql.create_table(table_name, col_def)
         self._execute(qry)
         return col_def
+
+    def retrieve_table(self, table_name):
+        qry = ql.retrieve_table(table_name)
+        rs = self._execute(qry)
+        return rs.get_result_table()
+
+    def get_hist(self, table_name:str, column_name:str):
+        qry = ql.get_hist(table_name, column_name)
+        rs = self._execute(qry)
+        return rs.get_value()
 
     def _execute(self, qry) -> ResultSet | None:
         self.__cursor.execute(qry)

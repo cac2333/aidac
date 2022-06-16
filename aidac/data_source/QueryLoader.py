@@ -54,3 +54,9 @@ class QueryLoader:
 
     def column_card(self, table):
         return self.load_query('column_num').format(table)
+
+    def retrieve_table(self, table):
+        return self.load_query('retrieve_table').format(table)
+
+    def get_hist(self, table, column):
+        return self.load_query('column_hist').format(table, column)

@@ -5,9 +5,10 @@ from collections.abc import Iterable
 from aidac.data_source.DataSourceManager import manager
 from aidac.common.meta import MetaInfo
 import aidac.dataframe.frame as frame
-from aidac.exec.Executable import Executable, TransferExecutable
+from aidac.exec.Executable import *
 
 LOCAL_DS = '_local'
+
 
 def _link_tb(df: frame.RemoteTable, spc_ds=None) -> str | None:
     """
@@ -16,14 +17,37 @@ def _link_tb(df: frame.RemoteTable, spc_ds=None) -> str | None:
     @return: None if no matching table is found, otherwise return the name of the table
     """
     ds = spc_ds if spc_ds else df.source
-    if df.tbl_name is not None:
-        return df.tbl_name
+    if df.source_table is not None:
+        return df.source_table
     else:
         tid = df.id
         if ds is None or tid not in ds.ls_tables():
             return None
         else:
             return tid
+
+
+def is_local(df1: frame.DataFrame, df2: frame.DataFrame):
+    """
+    check if two dataframes are local to each other
+    @param df1:
+    @param df2:
+    @return:
+    """
+    if df1.source is not None and df2.source is not None:
+        # if two data frames have the same source then they are considered local to each other
+        if df1.source.job_name == df2.source.job_name:
+            return True
+        # if there are other data sources / stubs associated with the df, we check for all stubs
+        if df1._stubs_:
+            for stub in df1._stubs_:
+                if is_local(stub, df2):
+                    return True
+        elif df2._stubs_:
+            for stub in df2._stubs_:
+                if is_local(stub, df1):
+                    return True
+        return False
 
 
 class Scheduler:
@@ -42,70 +66,13 @@ class Scheduler:
         if ds:
             if isinstance(cur, frame.LocalTable):
                 # follow the same procedure as remote db if local table has a remote stub
-                if ds in cur._stub_:
-                    cur = cur._stub_[ds]
+                if ds in cur._stubs_:
+                    cur = cur._stubs_[ds]
                 else:
                     return False
             return True if _link_tb(cur) else False
         else:
             return df._data_ is not None
-
-    def _max_card(self, metas):
-        """
-
-        @param metas:
-        @return: datasource that has most data
-        """
-        jobs = {}
-        for df, mt in metas:
-            jname = df.source.job_name if df.source else LOCAL_DS
-            # use the product of row and column to estimate the cardinality
-            if jname in jobs:
-                jobs[jname] += mt.ncols * mt.nrows
-            else:
-                jobs[jname] = mt.ncols * mt.nrows
-
-        maxc = 0
-        opt = None
-        for jname, card in jobs.items():
-            if card > maxc:
-                maxc = card
-                opt = jname
-        # todo: maxc might not be the desired opt meta
-        return 'p1', maxc
-
-    def _dfs_link_ds(self, df: frame.DataFrame) -> (str, MetaInfo):
-        """
-        Link data source at the same time
-        @param df:
-        @return: (ds job name, meta)
-        """
-        if isinstance(df, frame.LocalTable) or df._data_ is not None or df.transform is None:
-            return None, self.meta(df)
-        else:
-            assert df.transform is not None
-            src_meta = []
-            # if have multiple sources, use the one has the largest cardinality
-            trans_src = df.transform.sources()
-            if isinstance(trans_src, tuple) or isinstance(trans_src, list):
-                for s in trans_src:
-                    meta = self.meta(s)
-                    src_meta.append((s, meta))
-            else:
-                meta = self.meta(trans_src)
-                src_meta.append((trans_src, meta))
-
-            opt_ds, opt_meta = self._max_card(src_meta)
-
-            ds = self.source_manager.get_data_source(opt_ds)
-            assert ds is not None
-            # use parent's datasource
-            # todo: duplicated data over different places
-            if df.source is None:
-                df.set_ds(ds)
-            else:
-                df.add_source(ds)
-        return opt_ds, opt_meta
 
     def execute(self, df: frame.DataFrame):
         """
@@ -118,40 +85,25 @@ class Scheduler:
             stack = [df]
             while stack:
                 cur = stack.pop()
-                if cur._data_ is not None or cur.tbl_name is not None:
+                if cur._data_ is not None or cur.source_table is not None:
                     return ex1
                 else:
                     assert cur.transform is not None
                     sources = cur.transform.sources()
                     if isinstance(sources, frame.DataFrame):
-                        sources = (sources, )
-                    for s in sources:
-                        # todo: check if source in the same data source as current
-                        if _link_tb(s, cur.source):
-                            stack.append(s)
-                        else:
-                            # datasources diverge here, create a data transfer node
-                            pex = TransferExecutable(cur)
-                            pex.add_prereq(_gen_pipe(s))
-                            ex1.add_prereq(pex)
+                        stack.append(sources)
+                    else:
+                        sblock = ScheduleExecutable(ex1)
+                        for s in sources:
+                            # todo: check if source in the same data source as current
+                            sblock.add_prereq(_gen_pipe(s))
+                        ex1.add_prereq(sblock)
             return ex1
-        self._dfs_link_ds(df)
+        # self._dfs_link_ds(df)
         ex = _gen_pipe(df)
+        ex.plan()
         return ex.process()
 
-
-    def schedule(self, df: frame.DataFrame):
-        """
-        Schedule and build execution plan for the given dataframe
-        @param df:
-        @return:
-        """
-        if df._data_ is not None:
-            return df._data_
-        else:
-            self._dfs_link_ds(df)
-            data = df.source._execute(df.genSQL)
-            return data
 
     def meta(self, df: frame.DataFrame):
         """
