@@ -7,7 +7,7 @@ from aidac.common.column import Column
 from aidac.common.hist import Histgram
 from aidac.common.meta import MetaInfo
 from aidac.dataframe import frame
-from utils import *
+from aidac.exec.utils import *
 
 from aidac.data_source.DataSourceManager import manager, LOCAL_DS
 

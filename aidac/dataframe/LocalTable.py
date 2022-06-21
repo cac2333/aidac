@@ -9,7 +9,7 @@ import re
 from pandas._libs.lib import NoDefault
 
 from aidac.common.column import Column
-from aidac.dataframe import DataFrame
+from aidac.dataframe.frame import DataFrame
 
 
 # TODO: add compatible for other DataFrame types
