@@ -267,6 +267,11 @@ class RemoteTable(DataFrame):
         transform = SQLOrderTransform(self, keys)
         return RemoteTable(self.source, transform)
 
+    def query(self, expr: str):
+        transform = SQLQuery(self, expr)
+        return RemoteTable(self.source, transform)
+
+
     def groupby(self, by: Union[List[str], str], groupcols: Union[List[str], str, None]):
         if isinstance(by, str):
             by_ = [by]
@@ -308,6 +313,8 @@ class RemoteTable(DataFrame):
         else:
             trans = SQLJoinTransform(self, other, on, on, how, suffix)
         return RemoteTable(transform=trans)
+
+
 
     @property
     def table_name(self):

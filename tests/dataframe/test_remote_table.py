@@ -97,6 +97,16 @@ class MyTestCase(unittest.TestCase):
         sql_ = dn2.transform.genSQL
         self.assertEqual(sql_, "DELETE FROM couple where couple_id is NULL;")
 
+    def test_query(self):
+        q = self.coup_.query("couple_id BETWEEN 10 AND 100")
+        self.assertTrue(isinstance(q.transform, SQLQuery))
+        sql = q.transform.genSQL
+        self.assertEqual(sql, "SELECT * FROM couple WHERE couple_id BETWEEN 10 AND 100")
+
+        q2 = self.coup_.query("couple_id == 100 and sid != 0")
+        self.assertTrue(isinstance(q2.transform, SQLQuery))
+        sql2 = q2.transform.genSQL
+        self.assertEqual(sql2, "SELECT * FROM couple WHERE couple_id = 100 and sid <> 0")
 
 
 if __name__ == '__main__':

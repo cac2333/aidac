@@ -301,6 +301,8 @@ class LocalTable(DataFrame):
     def squeeze(self, axis=None):
         return LocalTable(self._data_.squeeze(axis))
 
+
+
     @classmethod
     # def join(self, other, left_on: Union[list, str], right_on: Union[list, str], join_type: str):
         # '''
