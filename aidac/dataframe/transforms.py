@@ -4,6 +4,7 @@ import collections
 import copy
 import weakref
 from collections.abc import Iterable
+from enum import Enum
 
 from aidac.dataframe import frame
 from aidac.common.column import Column
@@ -32,6 +33,19 @@ class Transform:
     def multi_source(self) -> bool: pass
 
 
+class OP(Enum):
+    ADD = '+';
+    SUBTRACT = '-';
+    MULTIPLY = '*';
+    DIVIDE = '/';
+    NEGATIVE = '(-)';
+    EXP = '**';
+    MATRIXMULTIPLY = '@';
+    TRANSPOSE = 'T';
+    LHS = 'LHS';
+    RHS = 'RHS';
+
+
 class TableTransform(Transform):
     def __init__(self, tableTransformFunc):
         self.tableTransformFunc = tableTransformFunc
@@ -56,6 +70,30 @@ def _col_in_source(source: frame.DataFrame, col: Column):
 
 def infer_col_type(cols: Column):
     pass
+
+
+class AlgebraicTransform(Transform):
+    def __init__(self, source):
+        self._columns_ = None
+        self._source_ = weakref.proxy(source) if (source) else None
+
+    @property
+    # The columns that will be produced once this transform is applied on its source.
+    def columns(self):
+        if not self._columns_:
+            self._columns_ = copy.deepcopy(self._source_.columns)
+        return self._columns_
+
+    @property
+    def rows(self):
+        return None
+
+    @property
+    def genSQL(self):
+        return self._source_
+
+    def sources(self):
+        return self._source_
 
 
 class SQLTransform(Transform):
