@@ -283,6 +283,46 @@ class SQLOrderTransform(SQLTransform):
             sql_text += key_res + ' ' + sort_order + ' '
         return self._source_.genSQL + ' ' + sql_text
 
+class SQLHeadTransform(SQLTransform):
+    def __init__(self, source, n):
+        super().__init__(source)
+        self._num_ = n
+
+    @property
+    def columns(self):
+        if not self._columns_:
+            self._columns_ = self._source_.columns
+        return self._columns_
+
+    @property
+    def genSQL(self):
+
+        sql_text = self._source_.genSQL + ' LIMIT ' + str(self._num_)
+        return sql_text
+
+class SQLTailTransform(SQLTransform):
+    def __init__(self, source, n):
+        super().__init__(source)
+        self._num_ = n
+
+    @property
+    def columns(self):
+        if not self._columns_:
+            self._columns_ = self._source_.columns
+        return self._columns_
+
+    @property
+    def genSQL(self):
+        sql_text = self._source_.genSQL + ' LIMIT ' + str(self._num_) + ' OFFSET' +' (' +'SELECT COUNT(*) FROM ' \
+                   + self._source_.table_name + ') ' + '- ' + str(self._num_)
+        return sql_text
+
+class SQLInsertTransform(SQLTransform):
+    def __init__(self, source, column, value):
+        super().__init__(source)
+        self._insertcols_ = column
+        self._values_ = value
+
 
 class SQLGroupByTransform(SQLTransform):
     def __init__(self, source, projectcols, groupcols=None):
@@ -488,8 +528,11 @@ class SQLQuery(SQLTransform):
         return query
 
 class SQLApply(SQLTransform):
-    def __init__(self, source):
+    def __init__(self, source, func, axis):
         super().__init__(source)
+        self._func_ = func
+        self._axis_ = axis
+
 
 
 class SQLDropNA(SQLTransform):

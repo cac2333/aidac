@@ -47,9 +47,10 @@ class MyTestCase(unittest.TestCase):
     def test_remote_join(self):
         jn = self.users.merge(self.review, 'userid', 'inner')
         sql = jn.transform.genSQL
-        self.assertEqual(sql, 'SELECT users.userid AS userid_x, users.uname AS uname, users.email AS email, users.dateofbirth AS dateofbirth, '
-                              'review.userid AS userid_y, review.movid AS movid, review.reviewdate AS reviewdate, review.rating AS rating, review.reviewtxt AS reviewtxt '
-                              'FROM (SELECT * FROM users) users INNER JOIN (SELECT * FROM review) review ON users.userid = review.userid')
+        self.assertEqual(sql,
+                         'SELECT users.userid AS userid_x, users.uname AS uname, users.email AS email, users.dateofbirth AS dateofbirth, '
+                         'review.userid AS userid_y, review.movid AS movid, review.reviewdate AS reviewdate, review.rating AS rating, review.reviewtxt AS reviewtxt '
+                         'FROM (SELECT * FROM users) users INNER JOIN (SELECT * FROM review) review ON users.userid = review.userid')
         jn.materialize()
         dd = jn._data_
         print(dd)
@@ -59,6 +60,7 @@ class MyTestCase(unittest.TestCase):
         self.assertTrue(isinstance(order_.transform, SQLOrderTransform))
         sql = order_.transform.genSQL
         self.assertEqual(sql, 'SELECT * FROM couple ORDER BY sid asc ')
+
     # def test_schdule1(self):
     #     proj = self.station['sid']
     #     proj.materialize()
@@ -72,19 +74,19 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(sql, 'SELECT sid AS sid FROM (SELECT * FROM couple) couple GROUP BY sid')
 
     def test_fillna(self):
-
         fillna = self.coup_.fillna()
         self.assertTrue(isinstance(fillna.transform, SQLFillNA))
         sql = fillna.transform.genSQL
-        self.assertEqual(sql, "SELECT  coalesce( couple_id,'0')  AS couple_id, coalesce( hcardid,'0')  AS hcardid, coalesce( sid,'0')  AS sid FROM (SELECT * FROM couple) couple")
+        self.assertEqual(sql,
+                         "SELECT  coalesce( couple_id,'0')  AS couple_id, coalesce( hcardid,'0')  AS hcardid, coalesce( sid,'0')  AS sid FROM (SELECT * FROM couple) couple")
         #
+
     def test_dropduplicate(self):
         dd = self.coup_.drop_duplicates()
         self.assertTrue(isinstance(dd.transform, SQLDropduplicateTransform))
         print(f"current transform is {dd.transform}")
         sql = dd.transform.genSQL
         self.assertEqual(sql, 'SELECT DISTINCT couple_id, hcardid, sid FROM (SELECT * FROM couple) couple')
-
 
     def test_drop_na(self):
         dn = self.coup_.dropna()
@@ -107,6 +109,18 @@ class MyTestCase(unittest.TestCase):
         self.assertTrue(isinstance(q2.transform, SQLQuery))
         sql2 = q2.transform.genSQL
         self.assertEqual(sql2, "SELECT * FROM couple WHERE couple_id = 100 and sid <> 0")
+
+    def test_head(self):
+        h = self.coup_.head(5)
+        self.assertTrue(isinstance(h.transform, SQLHeadTransform))
+        sql = h.transform.genSQL
+        self.assertEqual(sql, 'SELECT * FROM couple LIMIT 5')
+
+    def test_tail(self):
+        t = self.coup_.tail(5)
+        self.assertTrue(isinstance(t.transform, SQLTailTransform))
+        sql = t.transform.genSQL
+        self.assertEqual(sql, 'SELECT * FROM couple LIMIT 5 OFFSET (SELECT COUNT(*) FROM couple) - 5')
 
 
 if __name__ == '__main__':

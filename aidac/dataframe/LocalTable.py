@@ -15,6 +15,7 @@ from aidac.dataframe.frame import DataFrame
 # TODO: add compatible for other DataFrame types
 
 class LocalTable(DataFrame):
+
     def __init__(self, data: pd.DataFrame, table_name=None):
         super().__init__(table_name)
         self._data_ = data
