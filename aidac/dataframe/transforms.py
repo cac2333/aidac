@@ -142,7 +142,7 @@ class SQLProjectionTransform(SQLTransform):
     def genSQL(self):
         projcoltxt = None
         for c in self.columns:  # Prepare the list of columns going into the select statement.
-            col = self.columns[c];
+            col = self.columns[c]
             projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + ((col.transform.columnExpr if (
                 col.transform) else col.srccol[0]) + ' AS ' + col.name);
 
@@ -214,7 +214,7 @@ class SQLJoinTransform(SQLTransform):
         for c in self.columns:  # Prepare the list of columns going into the select statement.
             col = self.columns[c]
             projcoltxt = ((projcoltxt + ', ') if projcoltxt else '') + (
-                        col.tablename + '.' + col.srccol[0] + ' AS ' + col.name)
+                    col.tablename + '.' + col.srccol[0] + ' AS ' + col.name)
 
         jointxt = None;  # The join condition SQL.
         if (self._jointype_ == 'cross'):
@@ -236,6 +236,78 @@ class SQLJoinTransform(SQLTransform):
         return sqlText
 
 
+class SQLRenameTransform(SQLTransform):
+
+    def __init__(self, source, col):
+        super().__init__(source)
+        self._modifiedcols_ = col
+
+    def _gen_column(self, source):
+
+        if not self._columns_:
+            colcount = 0
+
+            def _get_proj_col_info(c: dict | str):
+                nonlocal colcount
+                colcount += 1
+                if isinstance(c, dict):  # check if the projected column is given an alias name
+                    sc1 = list(c.keys())[0]  # get the source column name / function
+                    pc1 = c.get(sc1)  # and the alias name for projection.
+                else:
+                    sc1 = pc1 = c  # otherwise projected column name / function is the same as the source column.
+                # we only consider one possible source column as the renaming is one-one
+                # todo: may need to extend this to use F class
+                srccol = sc1
+                # projected column alias, use the one given, else take it from the expression if it has one, or else generate one.
+                projcol = pc1 if (isinstance(pc1, str)) else (
+                    sc1.columnExprAlias if (hasattr(sc1, 'columnExprAlias')) else 'col_'.format(colcount))
+                # coltransform = sc1 if (isinstance(sc1, F)) else None
+                # todo: extend this to use F class
+                coltransform = None
+                return srccol, projcol, coltransform
+
+            src_cols = source.columns
+            # columns = {};
+            columns = collections.OrderedDict();
+            for col_ in self._modifiedcols_.keys():
+                col = {col_: self._modifiedcols_.get(col_)}
+                srccol, projcoln, coltransform = _get_proj_col_info(col)
+
+                sdbtables = []
+                srccols = []
+                scol = src_cols.get(srccol)
+                if not scol:
+                    raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
+                else:
+                    srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
+                    sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
+
+                column = Column(projcoln, scol.dtype)
+                column.srccol = srccols
+                column.tablename = sdbtables
+                column.transform = coltransform
+                columns[projcoln] = column
+            self._columns_ = columns
+
+    @property
+    def columns(self):
+        if not self._columns_:
+            self._gen_column(self._source_)
+        return self._columns_
+
+    @property
+    def genSQL(self):
+        # print(self._source_.columns)
+
+        sqls = []
+        for key in self._modifiedcols_.keys():
+            sqltext = 'ALTER TABLE ' + self._source_.table_name + " " + key + ' TO ' + self._modifiedcols_[key] + ';'
+            sqls.append(sqltext)
+        sqlres = ''.join(sqls)
+
+        return sqlres
+
+
 class SQLOrderTransform(SQLTransform):
 
     def __init__(self, source, orderlist):
@@ -245,12 +317,6 @@ class SQLOrderTransform(SQLTransform):
 
     def _gen_column(self, source):
         pass
-
-        #   df.order(by = ...)
-
-        #
-        # def execute_source(self):
-        #     pass
 
     @property
     def columns(self):
@@ -283,6 +349,7 @@ class SQLOrderTransform(SQLTransform):
             sql_text += key_res + ' ' + sort_order + ' '
         return self._source_.genSQL + ' ' + sql_text
 
+
 class SQLHeadTransform(SQLTransform):
     def __init__(self, source, n):
         super().__init__(source)
@@ -296,9 +363,9 @@ class SQLHeadTransform(SQLTransform):
 
     @property
     def genSQL(self):
-
         sql_text = self._source_.genSQL + ' LIMIT ' + str(self._num_)
         return sql_text
+
 
 class SQLTailTransform(SQLTransform):
     def __init__(self, source, n):
@@ -313,15 +380,26 @@ class SQLTailTransform(SQLTransform):
 
     @property
     def genSQL(self):
-        sql_text = self._source_.genSQL + ' LIMIT ' + str(self._num_) + ' OFFSET' +' (' +'SELECT COUNT(*) FROM ' \
+        sql_text = self._source_.genSQL + ' LIMIT ' + str(self._num_) + ' OFFSET' + ' (' + 'SELECT COUNT(*) FROM ' \
                    + self._source_.table_name + ') ' + '- ' + str(self._num_)
         return sql_text
+
 
 class SQLInsertTransform(SQLTransform):
     def __init__(self, source, column, value):
         super().__init__(source)
         self._insertcols_ = column
         self._values_ = value
+
+    @property
+    def columns(self):
+        if not self._columns_:
+            self._columns_ = self._source_.columns
+        return self._columns_
+
+    @property
+    def genSQL(self):
+        sqltext = 'INSERT INTO ' + self._source_.table_name
 
 
 class SQLGroupByTransform(SQLTransform):
@@ -491,6 +569,7 @@ class SQLISNA(SQLTransform):
         super().__init__(source)
         self._targetcols_ = cols
 
+
 class SQLQuery(SQLTransform):
     def __init__(self, source, expr: str):
         super().__init__(source)
@@ -512,14 +591,13 @@ class SQLQuery(SQLTransform):
                 count -= 1
                 continue
 
-            if char == '=' and self._query_[i-1] == '=':
+            if char == '=' and self._query_[i - 1] == '=':
                 continue
 
-            if char == '!' and self._query_[i+1] == "=":
+            if char == '!' and self._query_[i + 1] == "=":
                 count = 1
                 cur += '<>'
                 continue
-
 
             cur += char
 
@@ -527,12 +605,12 @@ class SQLQuery(SQLTransform):
 
         return query
 
+
 class SQLApply(SQLTransform):
     def __init__(self, source, func, axis):
         super().__init__(source)
         self._func_ = func
         self._axis_ = axis
-
 
 
 class SQLDropNA(SQLTransform):

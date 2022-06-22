@@ -67,8 +67,6 @@ class MyTestCase(unittest.TestCase):
 
     def test_group_by(self):
         group_by = self.coup_.groupby("sid", ["sid"])
-        data = group_by.get_data()
-        print(f"data is {data}")
         self.assertTrue(isinstance(group_by.transform, SQLGroupByTransform))
         sql = group_by.transform.genSQL
         self.assertEqual(sql, 'SELECT sid AS sid FROM (SELECT * FROM couple) couple GROUP BY sid')
@@ -122,6 +120,11 @@ class MyTestCase(unittest.TestCase):
         sql = t.transform.genSQL
         self.assertEqual(sql, 'SELECT * FROM couple LIMIT 5 OFFSET (SELECT COUNT(*) FROM couple) - 5')
 
+    def test_rename(self):
+        r = self.coup_.rename({"couple_id": "cid"})
+        self.assertTrue(isinstance(r.transform, SQLRenameTransform))
+        sql = r.transform.genSQL
+        self.assertEqual(sql, 'ALTER TABLE couple couple_id TO cid;')
 
 if __name__ == '__main__':
     unittest.main()

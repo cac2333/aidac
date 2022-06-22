@@ -3,7 +3,7 @@ from abc import abstractmethod
 import collections
 
 import numpy as np
-from typing import Union, List
+from typing import Union, List, Dict
 
 from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource, local_ds
@@ -12,8 +12,8 @@ from aidac.exec.Executable import Executable
 import pandas as pd
 import uuid
 
-
 import aidac.dataframe.Scheduler as Scheduler
+
 sc = Scheduler.Scheduler()
 
 
@@ -23,7 +23,7 @@ def create_remote_table(source, table_name):
 
 class DataFrame:
     def __init__(self, table_name=None):
-        self.__tid__ = 't_'+uuid.uuid4().hex
+        self.__tid__ = 't_' + uuid.uuid4().hex
         self.source_table = table_name
         self._transform_ = None
         self._columns_ = None
@@ -80,7 +80,8 @@ class DataFrame:
         pass
 
     @abstractmethod
-    def filter(self, exp: str): pass
+    def filter(self, exp: str):
+        pass
 
     @abstractmethod
     def join(self, other: DataFrame, left_on: list | str, right_on: list | str, join_type: str):
@@ -90,107 +91,139 @@ class DataFrame:
         """
 
     @abstractmethod
-    def aggregate(self, projcols, groupcols=None): pass
+    def aggregate(self, projcols, groupcols=None):
+        pass
 
     @abstractmethod
-    def project(self, cols: list | str): pass
+    def project(self, cols: list | str):
+        pass
 
     @abstractmethod
-    def order(self, orderlist): pass
+    def order(self, orderlist):
+        pass
 
     @abstractmethod
-    def distinct(self): pass
+    def distinct(self):
+        pass
 
     @abstractmethod
-    def preview_lineage(self): pass
+    def preview_lineage(self):
+        pass
 
     """
     All binary algebraic operations may involve data from different data source
     """
-    @abstractmethod
-    def __add__(self, other): pass
 
     @abstractmethod
-    def __radd__(self, other): pass
+    def __add__(self, other):
+        pass
 
     @abstractmethod
-    def __mul__(self, other): pass
+    def __radd__(self, other):
+        pass
 
     @abstractmethod
-    def __rmul__(self, other): pass
+    def __mul__(self, other):
+        pass
 
     @abstractmethod
-    def __sub__(self, other): pass
+    def __rmul__(self, other):
+        pass
 
     @abstractmethod
-    def __rsub__(self, other): pass
+    def __sub__(self, other):
+        pass
 
     @abstractmethod
-    def __truediv__(self, other): pass
+    def __rsub__(self, other):
+        pass
 
     @abstractmethod
-    def __rtruediv__(self, other): pass
+    def __truediv__(self, other):
+        pass
 
     @abstractmethod
-    def __pow__(self, power, modulo=None): pass
+    def __rtruediv__(self, other):
+        pass
 
     @abstractmethod
-    def __matmul__(self, other): pass
+    def __pow__(self, power, modulo=None):
+        pass
 
     @abstractmethod
-    def __rmatmul__(self, other): pass
+    def __matmul__(self, other):
+        pass
+
+    @abstractmethod
+    def __rmatmul__(self, other):
+        pass
 
     @property
     @abstractmethod
-    def T(self): pass
+    def T(self):
+        pass
 
     @abstractmethod
-    def __getitem__(self, item): pass
+    def __getitem__(self, item):
+        pass
 
-    #WARNING !! Permanently disabled  !
-    #Weakref proxy invokes this function for some reason, which is forcing the dataframe objects to materialize.
-    #@abstractmethod
-    #def __len__(self): pass;
+    # WARNING !! Permanently disabled  !
+    # Weakref proxy invokes this function for some reason, which is forcing the dataframe objects to materialize.
+    # @abstractmethod
+    # def __len__(self): pass;
 
     @property
     @abstractmethod
-    def shape(self): pass
+    def shape(self):
+        pass
 
     @abstractmethod
-    def vstack(self, othersrclist): pass
+    def vstack(self, othersrclist):
+        pass
 
     @abstractmethod
-    def hstack(self, othersrclist, colprefixlist=None): pass
+    def hstack(self, othersrclist, colprefixlist=None):
+        pass
 
     @abstractmethod
-    def describe(self): pass
+    def describe(self):
+        pass
 
     @abstractmethod
-    def sum(self, collist=None): pass
+    def sum(self, collist=None):
+        pass
 
     @abstractmethod
-    def avg(self, collist=None): pass
+    def avg(self, collist=None):
+        pass
 
     @abstractmethod
-    def count(self, collist=None): pass
+    def count(self, collist=None):
+        pass
 
     @abstractmethod
-    def countd(self, collist=None): pass
+    def countd(self, collist=None):
+        pass
 
     @abstractmethod
-    def countn(self, collist=None): pass
+    def countn(self, collist=None):
+        pass
 
     @abstractmethod
-    def max(self, collist=None): pass
+    def max(self, collist=None):
+        pass
 
     @abstractmethod
-    def min(self, collist=None): pass
+    def min(self, collist=None):
+        pass
 
     @abstractmethod
-    def head(self,n=5): pass
+    def head(self, n=5):
+        pass
 
     @abstractmethod
-    def tail(self,n=5): pass
+    def tail(self, n=5):
+        pass
 
     @property
     def data(self):
@@ -198,7 +231,7 @@ class DataFrame:
 
 
 class RemoteTable(DataFrame):
-    def __init__(self, source: DataSource = None, transform: Transform = None, table_name: str=None):
+    def __init__(self, source: DataSource = None, transform: Transform = None, table_name: str = None):
         super().__init__(table_name)
         self._ds_ = source
         self.source_table = table_name
@@ -225,8 +258,6 @@ class RemoteTable(DataFrame):
                     self._columns_[col.name] = col
         return self._columns_
 
-
-
     def _link_table_meta(self):
         """
 
@@ -240,7 +271,7 @@ class RemoteTable(DataFrame):
     def materialize(self):
         self._data_ = sc.execute(self)
         return self._data_
-    
+
     def fillna(self, col, val):
         transform = SQLFillNA(self, col, val)
         return RemoteTable(self.source, transform)
@@ -252,8 +283,6 @@ class RemoteTable(DataFrame):
     def drop_duplicates(self):
         transform = SQLDropduplicateTransform(self)
         return RemoteTable(self.source, transform)
-
-    
 
     def order(self, orderlist: Union[List[str], str]):
 
@@ -274,7 +303,6 @@ class RemoteTable(DataFrame):
     def apply(self, func, axis=0):
         transform = SQLApply(self, func, axis)
         return RemoteTable(self.source, transform)
-
 
     def groupby(self, by: Union[List[str], str], groupcols: Union[List[str], str, None]):
         if isinstance(by, str):
@@ -322,8 +350,12 @@ class RemoteTable(DataFrame):
         transform = SQLHeadTransform(self, n)
         return RemoteTable(self.source, transform)
 
-    def tail(self,n=5):
+    def tail(self, n=5):
         transform = SQLTailTransform(self, n)
+        return RemoteTable(self.source, transform)
+
+    def rename(self, columns: Dict):
+        transform = SQLRenameTransform(self, columns)
         return RemoteTable(self.source, transform)
 
     @property
@@ -372,5 +404,3 @@ class LocalTable(DataFrame):
             else:
                 trans = SQLJoinTransform(self, other, on, on, how, suffix)
             return RemoteTable(transform=trans)
-
-
