@@ -174,6 +174,13 @@ class SQLJoinTransform(SQLTransform):
 
 
     @property
+    def join_cols(self):
+        """
+        @return: the join columns of 2 sources as a tuple
+        """
+        return self._src1joincols_, self._src2joincols_
+
+    @property
     def columns(self):
         if not self._columns_:
             src1cols = self._source1_.columns;
@@ -330,7 +337,7 @@ class SQLFillNA(SQLTransform):
         pass
 
     def genSQL(self):
-
+        pass
 
 class SQLDropduplicateTransform(SQLTransform):
     def __init__(self, source):
