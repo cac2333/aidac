@@ -6,7 +6,7 @@ import pandas
 from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource
 from aidac.data_source.QueryLoader import QueryLoader
-import psycopg2
+import psycopg
 from psycopg2.extensions import register_adapter, AsIs
 
 from aidac.data_source.ResultSet import ResultSet
@@ -31,7 +31,7 @@ class PostgreDataSource(DataSource):
     def connect(self):
         self.port = 5432 if self.port is None else self.port
 
-        self.__conn = psycopg2.connect(
+        self.__conn = psycopg.connect(
             f'''host={self.host} 
             dbname={self.dbname} 
             user={self.username} 
@@ -97,7 +97,12 @@ class PostgreDataSource(DataSource):
     def get_hist(self, table_name:str, column_name:str):
         qry = ql.get_hist(table_name, column_name)
         rs = self._execute(qry)
-        return rs.get_value()
+        # n_distinct = -1 if all values are distinct, otherwise a negative fraction is used
+        # todo: maybe we can optimise this later
+        table_name, null_frac, n_distinct, mcv = rs.get_value()
+        # need to calculate the actual distinct values
+        n_distinct = self.row_count(table_name) * (-n_distinct)
+        return table_name, null_frac, n_distinct, mcv
 
     def _execute(self, qry) -> ResultSet | None:
         self.__cursor.execute(qry)

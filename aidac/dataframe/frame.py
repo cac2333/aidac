@@ -272,11 +272,11 @@ class RemoteTable(DataFrame):
         self._data_ = sc.execute(self)
         return self._data_
 
-    def fillna(self, col, val):
+    def fillna(self, col=[], val=0):
         transform = SQLFillNA(self, col, val)
         return RemoteTable(self.source, transform)
 
-    def dropna(self, col):
+    def dropna(self, col=[]):
         transform = SQLDropNA(self, col)
         return RemoteTable(self.source, transform)
 

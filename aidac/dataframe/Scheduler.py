@@ -101,6 +101,7 @@ class Scheduler:
             return ex1
         # self._dfs_link_ds(df)
         ex = _gen_pipe(df)
+        ex.rs_required = True
         ex.plan()
         return ex.process()
 

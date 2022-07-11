@@ -213,6 +213,13 @@ class SQLJoinTransform(SQLTransform):
         self._rsuffix_ = suffix[1] if len(suffix) > 1 else ''
 
     @property
+    def join_cols(self):
+        """
+        @return: the join columns of 2 sources as a tuple
+        """
+        return self._src1joincols_, self._src2joincols_
+
+    @property
     def columns(self):
         if not self._columns_:
             src1cols = self._source1_.columns;

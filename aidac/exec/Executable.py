@@ -45,14 +45,14 @@ def get_meta(df: frame.DataFrame):
         return meta
 
 
-def get_hist(df: frame.DataFrame, col: Column):
+def get_hist(df: frame.DataFrame, col: str):
     if df._data_ is not None:
-        n_null = len(df.data[col.name].isnull())
         total = len(df.data)
-        n_distinct = len(df.data[col.name].unique())
+        n_null = df.data[col].isnull().sum()
+        n_distinct = len(df.data[col].unique())
         hist = Histgram(df.table_name, n_null/total, n_distinct)
     else:
-        table_name, null_frac, n_distinct, mcv = df.source.get_hist(df.table_name, col.name)
+        table_name, null_frac, n_distinct, mcv = df.source.get_hist(df.table_name, col)
         hist = Histgram(table_name, null_frac, n_distinct, mcv)
     return hist
 
@@ -63,6 +63,7 @@ class Executable:
         self.prereqs = []
         self.planned_job = None
         self.estimation = None
+        self.rs_required = False
 
     def process(self):
         """
@@ -148,11 +149,47 @@ class TransferExecutable(Executable):
         return
 
 
+class MasterExecutable(Executable):
+    def __init__(self):
+        self.prereqs = []
+
+    def _get_lowest_cost_path(self, paths):
+        lowest, opt_path = paths[0]
+        for cost, path in paths:
+            if lowest < cost:
+                lowest = cost
+                opt_path =path
+        return opt_path
+
+    def _insert_transfer_block(self, path):
+        if path:
+            cur = self.prereqs[0]
+            while not isinstance(cur, ScheduleExecutable):
+                # branches only occurs at the schedule executable block
+                assert len(cur.prereqs) <= 1, "None schedule executable block should not have more than 1 prereq"
+                cur = cur.prereqs[0]
+            # insert transfer block at the schedule block
+            dest = path.pop()
+            for x in cur.prereqs:
+                te = TransferExecutable(x.df, dest=dest)
+                te.add_prereq(x)
+                cur.prev.add_prereq(te)
+                # recursively add transfer blocks down the branch
+                self._insert_transfer_block(path)
+
+    def plan(self):
+        all_path = super.plan()
+        # only need to insert transfer block when other schedule executables are involved
+        if all_path:
+            path = self._get_lowest_cost_path(all_path)
+            self._insert_transfer_block(path)
+
+
 class ScheduleExecutable(Executable):
     """
         se
         |
-    -----------
+    -----------q
     |      |
     ex     ex
     determine the data transfer direction from nodes beneath it
@@ -175,7 +212,7 @@ class ScheduleExecutable(Executable):
             new_ds, card = self._traverse2end(s)
             all_source.update(new_ds)
         # local table and database table
-        if df.source.job_name == '_local_ds' or df.table_name in df.source.ls_tables():
+        if df.source.job_name == LOCAL_DS or df.table_name in df.source.ls_tables():
             all_source.add(df.source)
             card = get_meta(df)
         else:
@@ -207,12 +244,15 @@ class ScheduleExecutable(Executable):
         return opt, maxc
 
     def plan(self):
+        self.rs_required = self.prev.rs_required
+
         for x in self.prereqs:
             x.plan()
         metas = {}
         for x in self.prereqs:
             if x.planned_job is None:
                 # reach the end of lineage tree, the end must be either a database table or a local table
+                all_costs = self.find_all_transfer_n_cost()
                 all_ds, card = self._traverse2end(x.df)
                 ds_names = []
                 for ds in all_ds:
@@ -249,18 +289,77 @@ class ScheduleExecutable(Executable):
         if self.prev.df.source is None:
             self.prev.df.set_ds(manager.get_data_source(opt_job))
 
-    def estimate_transfer_amt(self, tbl1: frame.DataFrame, tbl2: frame.DataFrame, count_result: bool = False):
+    def estimate_transfer_costs(self, count_result: bool = False):
+        """
+
+        @param count_result:
+        @return:
+        """
+        pass
+
+    def find_local_transfer_costs(self, prev_dest=[]):
+        """compute the transfer cost for all possible data transferring at the local level
+        all_dest format:
+        [cost, all target job destination along the path(e.g. ['job1', 'job2'])]
+        """
+        # get the merged point transform
+        trans = self.prev.df.transform
+        all_dest = []
+        from aidac.dataframe.transforms import SQLJoinTransform
+        # calculate all cost for all possible data transfer
+        if isinstance(trans, SQLJoinTransform):
+            # we can assume the result set location will be the transfer destination
+            # we calculate the cost for all possible path
+            # (for every previous path we compute the transfer cost between it and every possible new destination)
+            for dest in trans.sources():
+                job_name = dest.job_name
+                for cost, path in prev_dest:
+                    # todo: remove redundant expressions
+                    new_path = path + [job_name]
+                    new_cost = cost + self.prior_join_cost(trans.sources(), dest)
+                    all_dest.append((new_cost, new_path))
+        else:
+            all_dest = []
+        return all_dest
+
+    def prior_join_cost(self, transfer_tables, dest):
+        """
+
+        @param transfer_tables:
+        @param dest: location where the join take place
+        @return: cost the transfer data to perform the join and the result size if transferring back is required
+        """
+        # collect metas for all tables needs to be transferred and calculate the cost to transfer them
+        metas = [get_meta(x) for x in transfer_tables if x.ds.job_name!=dest]
+        cost_before = 0
+        for meta in metas:
+            cost_before = meta.nrows*meta.ncols
+
+        joined_card = 0
+        if self.rs_required and dest!=LOCAL_DS:
+            joined_card = estimate_join_card(transfer_tables[0], transfer_tables[1])
+        return cost_before + joined_card
+
+    def estimate_join_card(self, tbl1, tbl2):
         """
         estimate the amount of tuples need to be transferred back and forth
-        @param tbl1: join table1
-        @param tbl2: join table2
         @param count_result: whether the result set will be transfered
         @return:
         """
         meta1 = get_meta(tbl1)
         meta2 = get_meta(tbl2)
-        if count_result:
-            rs_card = estimate_join_card(meta1.nrows, meta2.nrows, )
+
+        trans = self.prev.df.transform
+
+        from aidac.dataframe.transforms import SQLJoinTransform
+
+        assert isinstance(trans, SQLJoinTransform)
+        join1_cols, join2_cols = trans.join_cols
+        hist1 = get_hist(tbl1, join1_cols)
+        hist2 = get_hist(tbl2, join2_cols)
+
+        rs_card = estimate_join_card(meta1.nrows, meta2.nrows, hist1.null_frac, hist2.null_frac, hist1.n_distinct, hist2.n_distinct)
+        return rs_card
 
     def process(self):
         return
@@ -268,5 +367,4 @@ class ScheduleExecutable(Executable):
     def clear_lineage(self):
         for x in self.prereqs:
             x.clear_lineage()
-
 
