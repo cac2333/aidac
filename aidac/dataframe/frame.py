@@ -70,7 +70,7 @@ class DataFrame:
         return self._columns_
 
     @property
-    def source(self):
+    def data_source(self):
         return self._ds_
 
     def __repr__(self) -> str:
@@ -219,7 +219,7 @@ class RemoteTable(DataFrame):
                 # materialize column info
                 self._columns_ = self.transform.columns
             else:
-                cols = self.source.table_columns(self.source_table)
+                cols = self.data_source.table_columns(self.source_table)
                 self._columns_ = collections.OrderedDict()
                 for col in cols:
                     self._columns_[col.name] = col
@@ -243,15 +243,15 @@ class RemoteTable(DataFrame):
     
     def fillna(self, col, val):
         transform = SQLFillNA(self, col, val)
-        return RemoteTable(self.source, transform)
+        return RemoteTable(self.data_source, transform)
 
     def dropna(self, col):
         transform = SQLDropNA(self, col)
-        return RemoteTable(self.source, transform)
+        return RemoteTable(self.data_source, transform)
 
     def drop_duplicates(self):
         transform = SQLDropduplicateTransform(self)
-        return RemoteTable(self.source, transform)
+        return RemoteTable(self.data_source, transform)
 
     
 
@@ -265,7 +265,7 @@ class RemoteTable(DataFrame):
             keys = orderlist
 
         transform = SQLOrderTransform(self, keys)
-        return RemoteTable(self.source, transform)
+        return RemoteTable(self.data_source, transform)
 
     def groupby(self, by: Union[List[str], str], groupcols: Union[List[str], str, None]):
         if isinstance(by, str):
@@ -300,7 +300,7 @@ class RemoteTable(DataFrame):
             keys = [key]
 
         trans = SQLProjectionTransform(self, keys)
-        return RemoteTable(self.source, trans)
+        return RemoteTable(self.data_source, trans)
 
     def merge(self, other, on=None, left_on=None, right_on=None, how='left', suffix=('_x', '_y'), sort=False):
         if left_on and right_on:

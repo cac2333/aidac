@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import numpy as np
 
 from aidac.common.DataIterator import generator
 from aidac.common.column import Column
@@ -19,9 +20,9 @@ def is_local(df1: frame.DataFrame, df2: frame.DataFrame):
     @param df2:
     @return:
     """
-    if df1.source is not None and df2.source is not None:
+    if df1.data_source is not None and df2.data_source is not None:
         # if two data frames have the same source then they are considered local to each other
-        if df1.source.job_name == df2.source.job_name:
+        if df1.data_source.job_name == df2.data_source.job_name:
             return True
         # if there are other data sources / stubs associated with the df, we check for all stubs
         if df1._stubs_:
@@ -40,7 +41,9 @@ def get_meta(df: frame.DataFrame):
         meta = MetaInfo(df.columns, len(df.columns), len(df._data_))
         return meta
     else:
-        nr = df.source.row_count(df.table_name)
+        while df.transform is not None:
+            df = df.transform.sources()
+        nr = df.data_source.row_count(df.table_name)
         meta = MetaInfo(df.columns, len(df.columns), nr)
         return meta
 
@@ -49,10 +52,12 @@ def get_hist(df: frame.DataFrame, col: str):
     if df._data_ is not None:
         total = len(df.data)
         n_null = df.data[col].isnull().sum()
-        n_distinct = len(df.data[col].unique())
+        n_distinct = len(np.unique(df.data[col].to_numpy()))
         hist = Histgram(df.table_name, n_null/total, n_distinct)
     else:
-        table_name, null_frac, n_distinct, mcv = df.source.get_hist(df.table_name, col)
+        while df.transform is not None:
+            df = df.transform.sources()
+        table_name, null_frac, n_distinct, mcv = df.data_source.get_hist(df.table_name, col)
         hist = Histgram(table_name, null_frac, n_distinct, mcv)
     return hist
 
@@ -63,6 +68,7 @@ class Executable:
         self.prereqs = []
         self.planned_job = None
         self.estimation = None
+        # result set sent back required
         self.rs_required = False
 
     def process(self):
@@ -76,35 +82,46 @@ class Executable:
         for x in self.prereqs:
             x.process()
 
-        if self.planned_job == LOCAL_DS:
-            ss = self.df.transform.sources()
-            data = pd.merge(ss[0].data, ss[1].data, left_on='id', right_on='stscode', how='inner')
-        else:
-            import time
-            print('process')
-            start = time.time()
-            sql = self.df.genSQL
-            print('sql generated')
-            print(time.time() - start)
-            rs = self.df.source._execute(sql)
-            print('returned')
-            print(time.time() - start)
-            data = rs.get_result_table()
-            print(time.time()-start)
-            data = pd.DataFrame(data)
+        # if self.planned_job == LOCAL_DS:
+        #     ss = self.df.transform.sources()
+        #     data = pd.merge(ss[0].data, ss[1].data, left_on='id', right_on='stscode', how='inner')
+        # else:
+        import time
+        print('process, planned job={}'.format(self.planned_job))
+        start = time.time()
+        sql = self.df.genSQL
+        print('sql generated: \n{}'.format(sql))
+        print(time.time() - start)
+        rs = self.df.data_source._execute(sql)
+        print('returned')
+        print(time.time() - start)
+        data = rs.get_result_table()
+        print(time.time()-start)
+        data = pd.DataFrame(data)
+
         self.clear_lineage()
         self.df._data_ = data
         return data
 
     def plan(self):
-        for x in self.prereqs:
-            x.plan()
+        all_paths = []
+        if self.prereqs:
+            for x in self.prereqs:
+                all_paths.extend(x.plan())
+                x.rs_required = self.rs_required
+                return all_paths
+        else:
+            return [(0, Node(self.df.data_source.job_name, None))]
 
-    def add_prereq(self, other: Executable):
-        self.prereqs.append(other)
+    def add_prereq(self, *other: list[Executable]):
+        self.prereqs.extend(other)
 
     def clear_lineage(self):
         self.df.clear_lineage()
+
+    def pre_process(self):
+        for x in self.prereqs:
+            x.pre_process()
 
 
 class TransferExecutable(Executable):
@@ -120,6 +137,9 @@ class TransferExecutable(Executable):
         @param dest: destination data source
         @return: local stub points to the temporary table?
         """
+        if src.data_source.job_name == dest:
+            return
+
         scols = src.columns
         # todo: check for duplicate names
         if dest != LOCAL_DS:
@@ -127,6 +147,10 @@ class TransferExecutable(Executable):
             dest_ds.create_table(src.table_name, scols)
             dest_ds.import_table(src.table_name, scols, generator(src.data))
         # todo: decide if a local stub should be created
+
+    def removable(self):
+        if self.prereqs[0].planned_job == self.dest:
+            return self.prereqs[0]
 
     def process(self):
         """
@@ -149,40 +173,61 @@ class TransferExecutable(Executable):
         return
 
 
-class MasterExecutable(Executable):
+class RootExecutable(Executable):
     def __init__(self):
         self.prereqs = []
+        self.rs_required = True
 
     def _get_lowest_cost_path(self, paths):
         lowest, opt_path = paths[0]
         for cost, path in paths:
             if lowest < cost:
                 lowest = cost
-                opt_path =path
+                opt_path = path
         return opt_path
 
-    def _insert_transfer_block(self, path):
+    def _insert_transfer_block(self, cur: Executable, path: Node):
         if path:
-            cur = self.prereqs[0]
             while not isinstance(cur, ScheduleExecutable):
                 # branches only occurs at the schedule executable block
-                assert len(cur.prereqs) <= 1, "None schedule executable block should not have more than 1 prereq"
-                cur = cur.prereqs[0]
-            # insert transfer block at the schedule block
-            dest = path.pop()
-            for x in cur.prereqs:
-                te = TransferExecutable(x.df, dest=dest)
-                te.add_prereq(x)
-                cur.prev.add_prereq(te)
+                cur.planned_job = path.val
+                if cur.prereqs:
+                    cur = cur.prereqs[0]
+                else:
+                    # reach the end
+                    return
+
+                # insert transfer block at the schedule block
+            transfer_blocks = []
+            for x, p in zip(cur.prereqs, path.children):
+                te = TransferExecutable(x.df, prereqs=[x], dest=path.val)
+                transfer_blocks.append(te)
+                if cur.prev.data_source is None:
+                    cur.prev.set_ds(manager.get_data_source(path.val))
                 # recursively add transfer blocks down the branch
-                self._insert_transfer_block(path)
+                self._insert_transfer_block(x, p)
+            cur.prereqs.clear()
+            cur.prereqs.extend(transfer_blocks)
 
     def plan(self):
-        all_path = super.plan()
+        self.prereqs[0].rs_required = True
+        all_path = super().plan()
         # only need to insert transfer block when other schedule executables are involved
         if all_path:
             path = self._get_lowest_cost_path(all_path)
-            self._insert_transfer_block(path)
+            self._insert_transfer_block(self, path)
+            self.pre_process()
+
+    def process(self):
+        """
+        Need to process all prerequisites and update the lineage
+        @return:
+        """
+        for x in self.prereqs:
+            x.process()
+
+        if self.dest is not None:
+            self.transfer(self.df, self.dest)
 
 
 class ScheduleExecutable(Executable):
@@ -199,6 +244,7 @@ class ScheduleExecutable(Executable):
     def __init__(self, prev):
         self.prev = prev
         self.prereqs = []
+        self.rs_required = False
 
     def _traverse2end(self, df: frame.DataFrame):
         """
@@ -212,8 +258,8 @@ class ScheduleExecutable(Executable):
             new_ds, card = self._traverse2end(s)
             all_source.update(new_ds)
         # local table and database table
-        if df.source.job_name == LOCAL_DS or df.table_name in df.source.ls_tables():
-            all_source.add(df.source)
+        if df.data_source.job_name == LOCAL_DS or df.table_name in df.data_source.ls_tables():
+            all_source.add(df.data_source)
             card = get_meta(df)
         else:
             # we are sure here we will not have a fork, as it would be captured by a new scheduleExecutable
@@ -244,58 +290,12 @@ class ScheduleExecutable(Executable):
         return opt, maxc
 
     def plan(self):
-        self.rs_required = self.prev.rs_required
-
+        all_path = []
         for x in self.prereqs:
-            x.plan()
-        metas = {}
-        for x in self.prereqs:
-            if x.planned_job is None:
-                # reach the end of lineage tree, the end must be either a database table or a local table
-                all_costs = self.find_all_transfer_n_cost()
-                all_ds, card = self._traverse2end(x.df)
-                ds_names = []
-                for ds in all_ds:
-                    if ds.job_name in metas:
-                        metas[ds.job_name].append(card)
-                    else:
-                        metas[ds.job_name] = [card]
-                        ds_names.append(ds.job_name)
-                x.estimation = card
-                x.planned_job = ds_names
-            else:
-                if x.planned_job in metas:
-                    metas[x.planned_job].append(x.estimation)
-                metas[x.planned_job] = [x.estimation]
+            path = x.plan()
+            all_path.append(path)
+        return self.find_local_transfer_costs(all_path)
 
-        opt_job, estimated_card = self._max_card(metas)
-
-        # if the dataframe already in the planned data source, we directly link to the previous execution
-        # by doing nothing, the prev node will generate sql upto a materialized node
-        for x in self.prereqs:
-            if isinstance(x.planned_job, list) and opt_job in x.planned_job:
-                x.planned_job = opt_job
-            elif isinstance(x.planned_job, str) and x.planned_job == opt_job:
-                pass
-            else:
-                # else we do add a data transfer executable first
-                # and everything need to be materialized before we do the data transfer
-                te = TransferExecutable(x.df, dest=opt_job)
-                te.add_prereq(x)
-                self.prev.add_prereq(te)
-        # assign the estimated job and cardinality to the joint of the branches
-        self.prev.estimation = estimated_card
-        self.prev.planned_job = opt_job
-        if self.prev.df.source is None:
-            self.prev.df.set_ds(manager.get_data_source(opt_job))
-
-    def estimate_transfer_costs(self, count_result: bool = False):
-        """
-
-        @param count_result:
-        @return:
-        """
-        pass
 
     def find_local_transfer_costs(self, prev_dest=[]):
         """compute the transfer cost for all possible data transferring at the local level
@@ -303,7 +303,7 @@ class ScheduleExecutable(Executable):
         [cost, all target job destination along the path(e.g. ['job1', 'job2'])]
         """
         # get the merged point transform
-        trans = self.prev.df.transform
+        trans = self.prev.transform
         all_dest = []
         from aidac.dataframe.transforms import SQLJoinTransform
         # calculate all cost for all possible data transfer
@@ -311,18 +311,36 @@ class ScheduleExecutable(Executable):
             # we can assume the result set location will be the transfer destination
             # we calculate the cost for all possible path
             # (for every previous path we compute the transfer cost between it and every possible new destination)
-            for dest in trans.sources():
-                job_name = dest.job_name
-                for cost, path in prev_dest:
-                    # todo: remove redundant expressions
-                    new_path = path + [job_name]
-                    new_cost = cost + self.prior_join_cost(trans.sources(), dest)
-                    all_dest.append((new_cost, new_path))
-        else:
-            all_dest = []
-        return all_dest
+            assert len(self.prereqs) == 2
+            plan1 = self.prereqs[0].plan()
+            plan2 = self.prereqs[1].plan()
 
-    def prior_join_cost(self, transfer_tables, dest):
+            estimate_card = self.estimate_join_card(self.prereqs[0].df, self.prereqs[1].df)
+            all_plans = []
+            for cost1, path1 in plan1:
+                for cost2, path2 in plan2:
+                    # todo: remove redundant expressions
+                    if path1.val == path2.val:
+                        job_name = path1.val
+                        new_path = Node(job_name, [path1, path2])
+                        new_cost = cost1 + cost2
+                        all_plans.append((new_cost, new_path))
+                    else:
+                        # path separate as there are two possible destinations
+                        new_path = Node(path1.val, [path1, path2])
+                        new_cost = cost1 + cost2 + self.prior_join_cost(trans.sources(), (path1.val, path2.val),
+                                                                        path1.val, estimate_card)
+                        all_plans.append((new_cost, new_path))
+
+                        new_path = Node(path2.val, [path1, path2])
+                        new_cost = cost1 + cost2 + self.prior_join_cost(trans.sources(), (path1.val, path2.val),
+                                                                        path2.val, estimate_card)
+                        all_plans.append((new_cost, new_path))
+        else:
+            all_plans = [[0, None]]
+        return all_plans
+
+    def prior_join_cost(self, transfer_tables, cur_jobs, dest, joined_card):
         """
 
         @param transfer_tables:
@@ -330,14 +348,17 @@ class ScheduleExecutable(Executable):
         @return: cost the transfer data to perform the join and the result size if transferring back is required
         """
         # collect metas for all tables needs to be transferred and calculate the cost to transfer them
-        metas = [get_meta(x) for x in transfer_tables if x.ds.job_name!=dest]
+        metas = []
+        for table, job in zip(transfer_tables, cur_jobs):
+            if job != dest:
+                metas.append(get_meta(table))
+
         cost_before = 0
         for meta in metas:
             cost_before = meta.nrows*meta.ncols
 
-        joined_card = 0
-        if self.rs_required and dest!=LOCAL_DS:
-            joined_card = estimate_join_card(transfer_tables[0], transfer_tables[1])
+        joined_card = joined_card if self.rs_required and dest != LOCAL_DS else 0
+
         return cost_before + joined_card
 
     def estimate_join_card(self, tbl1, tbl2):
@@ -349,7 +370,7 @@ class ScheduleExecutable(Executable):
         meta1 = get_meta(tbl1)
         meta2 = get_meta(tbl2)
 
-        trans = self.prev.df.transform
+        trans = self.prev.transform
 
         from aidac.dataframe.transforms import SQLJoinTransform
 
@@ -361,8 +382,18 @@ class ScheduleExecutable(Executable):
         rs_card = estimate_join_card(meta1.nrows, meta2.nrows, hist1.null_frac, hist2.null_frac, hist1.n_distinct, hist2.n_distinct)
         return rs_card
 
+    def pre_process(self):
+        new_prereqs = []
+        for x in self.prereqs:
+            child = x.removable()
+            if child:
+                self.prereqs.remove(x)
+                new_prereqs.append(child)
+        self.prereqs.extend(new_prereqs)
+
     def process(self):
-        return
+        for x in self.prereqs:
+            x.process()
 
     def clear_lineage(self):
         for x in self.prereqs:

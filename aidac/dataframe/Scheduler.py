@@ -16,7 +16,7 @@ def _link_tb(df: frame.RemoteTable, spc_ds=None) -> str | None:
     @param df:
     @return: None if no matching table is found, otherwise return the name of the table
     """
-    ds = spc_ds if spc_ds else df.source
+    ds = spc_ds if spc_ds else df.data_source
     if df.source_table is not None:
         return df.source_table
     else:
@@ -34,9 +34,9 @@ def is_local(df1: frame.DataFrame, df2: frame.DataFrame):
     @param df2:
     @return:
     """
-    if df1.source is not None and df2.source is not None:
+    if df1.data_source is not None and df2.data_source is not None:
         # if two data frames have the same source then they are considered local to each other
-        if df1.source.job_name == df2.source.job_name:
+        if df1.data_source.job_name == df2.data_source.job_name:
             return True
         # if there are other data sources / stubs associated with the df, we check for all stubs
         if df1._stubs_:
@@ -93,7 +93,7 @@ class Scheduler:
                     if isinstance(sources, frame.DataFrame):
                         stack.append(sources)
                     else:
-                        sblock = ScheduleExecutable(ex1)
+                        sblock = ScheduleExecutable(cur)
                         for s in sources:
                             # todo: check if source in the same data source as current
                             sblock.add_prereq(_gen_pipe(s))
@@ -101,9 +101,10 @@ class Scheduler:
             return ex1
         # self._dfs_link_ds(df)
         ex = _gen_pipe(df)
-        ex.rs_required = True
-        ex.plan()
-        return ex.process()
+        root_ex = RootExecutable()
+        root_ex.add_prereq(ex)
+        root_ex.plan()
+        return root_ex.process()
 
 
     def meta(self, df: frame.DataFrame):
@@ -126,6 +127,6 @@ class Scheduler:
                 return self.meta(df.transform.sources()[0])
             return self.meta(df.transform.sources())
         else:
-            nr = df.source.row_count(tb_name)
+            nr = df.data_source.row_count(tb_name)
             meta = MetaInfo(df.columns, len(df.columns), nr)
             return meta

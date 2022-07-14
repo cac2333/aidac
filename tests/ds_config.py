@@ -1,7 +1,9 @@
 PG_CONFIG = {
-    'host': 'winter2022-comp421.cs.mcgill.ca',
-    'dbname': 'cs421',
-    'user': 'xwang223',
-    'passwd': '',
+    'host': 'localhost',
+    'dbname': 'myDB',
+    'user': 'postgres',
+    'passwd': 'postgres',
     'port': '5432'
 }
+
+"""(Keep cached data in db, only delete when python object is deleted, master->main?)"""

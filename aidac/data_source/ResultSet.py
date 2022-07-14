@@ -21,7 +21,9 @@ class ResultSet:
         get the first result tuple
         @return:
         """
-        rs = self.data[0] if len(self.data[0]) > 1 else self.data[0][0]
+        rs = self.data
+        if self.data:
+            rs = self.data[0] if len(self.data[0]) > 1 else self.data[0][0]
         return rs
 
     def _format2pd(self):

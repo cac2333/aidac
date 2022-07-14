@@ -8,7 +8,7 @@ class TestDataFrameBase(unittest.TestCase):
         from tests.ds_config import PG_CONFIG
         config = PG_CONFIG
         aidac.add_data_source('postgres', config['host'], config['user'], config['passwd'], config['dbname'], 'p1', config['port'])
-        self.station = aidac.read_remote_data('p1', 'station')
+        self.station = aidac.read_remote_data('p1', 'stations2017')
         self.trip = aidac.read_remote_data('p1', 'tripdata2017')
 
         self.trip_path = 'resources/tripdata2017.csv'

@@ -57,7 +57,7 @@ class PostgreDataSource(DataSource):
     def table_columns(self, table: str):
         qry = ql.table_columns(table)
         rs = self._execute(qry)
-        # expected return value from pd:
+        # expected return value from pg:
         # schemaname, tablename, columnname, columntype, columnsize, columnpos, nullable
         cols = [Column(x[2], typeConverter_rev[x[3]], x[1], x[0], constant_converter[x[-1]]) for x in rs.data]
         return cols

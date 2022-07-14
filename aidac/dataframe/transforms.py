@@ -158,8 +158,8 @@ class SQLJoinTransform(SQLTransform):
     def __init__(self, source1, source2, src1joincols, src2joincols, join, suffix):
         super().__init__(None);
 
-        if(not(join == 'cross') and len(src1joincols) != len(src2joincols)):
-            raise AttributeError('src1joincols and src2joincols should have same number columns');
+        # if(not(join == 'cross') and not isinstance(src1joincols, str) and len(src1joincols) != len(src2joincols)):
+        #     raise AttributeError('src1joincols and src2joincols should have same number columns');
 
         self._source1_ = weakref.proxy(source1)
         self._source2_ = weakref.proxy(source2)
@@ -190,7 +190,8 @@ class SQLJoinTransform(SQLTransform):
                 projcols=sourcecols;
                 projcolumns = list();
                 for c in projcols.values():
-                    if c.name in self._src1joincols_ and c.name in self._src2joincols_:
+                    if (isinstance(self._src1joincols_, str) and c.name == self._src1joincols_ and c.name == self._src2joincols_)\
+                            or (isinstance(self._src1joincols_, list) and c.name in self._src1joincols_ and c.name in self._src2joincols_):
                         # if the name is common in two columns, we give it a suffix
                         proj_name = c.name+suffix
                     else:
