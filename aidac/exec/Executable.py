@@ -71,6 +71,46 @@ class Executable:
         # result set sent back required
         self.rs_required = False
 
+    def to_be_executed_locally(self, df):
+        """
+        check a dataframe and its source to see if it can be executed locally
+        @return:
+        """
+        if df.data is not None:
+            return True
+        if df.transform is not None:
+            # as each executable only get to join operations
+            if isinstance(df.transform.sources(), tuple):
+                for src in df.transform.sources():
+                    if not self.to_be_executed_locally(src):
+                        return False
+            else:
+                return self.to_be_executed_locally(df.transform.sources())
+        return True
+    
+    def perform_local_operation(self, df):
+        if df.data is not None:
+            return df.data
+
+        sources = df.transform.sources()
+
+        # todo: do we also want to save the intermediate results?
+        if isinstance(sources, tuple):
+            data1 = self.perform_local_operation(sources[0])
+            data2 = self.perform_local_operation(sources[1])
+            func = getattr(pd.DataFrame, df._saved_func_name_)
+            data = func(data1, data2, **df._saved_args_)
+        else:
+            if sources.data is None:
+                data = self.perform_local_operation(sources)
+            else:
+                data = sources.data
+            func = getattr(pd.DataFrame, df._saved_func_name_)
+            print(df._saved_args_)
+            print(data.columns)
+            data = func(data, **df._saved_args_)
+        return data
+
     def process(self):
         """
         Need to process all prerequisites and update the lineage
@@ -82,23 +122,23 @@ class Executable:
         for x in self.prereqs:
             x.process()
 
-        # if self.planned_job == LOCAL_DS:
-        #     ss = self.df.transform.sources()
-        #     data = pd.merge(ss[0].data, ss[1].data, left_on='id', right_on='stscode', how='inner')
-        # else:
         import time
         print('process, planned job={}'.format(self.planned_job))
         start = time.time()
-        sql = self.df.genSQL
-        print('sql generated: \n{}'.format(sql))
-        print(time.time() - start)
-        rs = self.df.data_source._execute(sql)
-        print('returned')
-        print(time.time() - start)
-        data = rs.get_result_table()
-        print(time.time()-start)
-        data = pd.DataFrame(data)
-
+        if self.planned_job == LOCAL_DS:
+            assert self.to_be_executed_locally(self.df)
+            data = self.perform_local_operation(self.df)
+        else:
+            sql = self.df.genSQL
+            print('sql generated: \n{}'.format(sql))
+            print(time.time() - start)
+            ds = manager.get_data_source(self.planned_job)
+            rs = ds._execute(sql)
+            print('returned')
+            print(time.time() - start)
+            data = rs.get_result_table()
+            print(time.time()-start)
+            data = pd.DataFrame(data)
         self.clear_lineage()
         self.df._data_ = data
         return data
@@ -225,9 +265,6 @@ class RootExecutable(Executable):
         """
         for x in self.prereqs:
             x.process()
-
-        if self.dest is not None:
-            self.transfer(self.df, self.dest)
 
 
 class ScheduleExecutable(Executable):

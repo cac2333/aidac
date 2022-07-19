@@ -12,8 +12,8 @@ from aidac.exec.Executable import Executable
 import pandas as pd
 import uuid
 
-
 import aidac.dataframe.Scheduler as Scheduler
+
 sc = Scheduler.Scheduler()
 
 
@@ -22,14 +22,16 @@ def create_remote_table(source, table_name):
 
 
 class DataFrame:
-    def __init__(self, table_name=None):
-        self.__tid__ = 't_'+uuid.uuid4().hex
+    def __init__(self, table_name=None, data=None, transform=None):
+        self.__tid__ = 't_' + uuid.uuid4().hex
         self.source_table = table_name
-        self._transform_ = None
+        self._transform_ = transform
         self._columns_ = None
         self._ds_ = None
         self._stubs_ = []
-        self._data_ = None
+        self._data_ = data
+        self._saved_func_name_ = None
+        self._saved_args_ = {}
 
     def get_data(self):
         return self._data_
@@ -58,6 +60,10 @@ class DataFrame:
         return self._transform_
 
     @property
+    def genSQL(self):
+        return 'SELECT * FROM ' + self.table_name
+
+    @property
     def columns(self):
         if self._columns_ is None:
             cols = {}
@@ -79,118 +85,158 @@ class DataFrame:
         """
         pass
 
-    @abstractmethod
-    def filter(self, exp: str): pass
+    def merge(self, other, on=None, left_on=None, right_on=None, how='left', suffix=('_x', '_y'), sort=False):
+        func_name = 'merge'
+        saved_args = {'on': on, 'how': how, 'left_on': left_on, 'right_on': right_on,
+                             'suffixes': suffix, 'sort': sort}
+        if isinstance(other, LocalTable):
+            return LocalTable(self._data_.merge(other, on, how, left_on=left_on, right_on=right_on,
+                                                suffix=suffix, sort=sort))
+        else:
+            if left_on and right_on:
+                trans = SQLJoinTransform(self, other, left_on, right_on, how, suffix)
+            else:
+                trans = SQLJoinTransform(self, other, on, on, how, suffix)
+            tb = RemoteTable(transform=trans)
+            tb._saved_func_name_ = func_name
+            tb._saved_args_ = saved_args
+            return tb
+
 
     @abstractmethod
-    def join(self, other: DataFrame, left_on: list | str, right_on: list | str, join_type: str):
+    def aggregate(self, projcols, groupcols=None):
         pass
-        """
-        May involve mixed data source
-        """
 
     @abstractmethod
-    def aggregate(self, projcols, groupcols=None): pass
+    def project(self, cols: list | str):
+        pass
 
     @abstractmethod
-    def project(self, cols: list | str): pass
+    def order(self, orderlist):
+        pass
 
     @abstractmethod
-    def order(self, orderlist): pass
+    def distinct(self):
+        pass
 
     @abstractmethod
-    def distinct(self): pass
-
-    @abstractmethod
-    def preview_lineage(self): pass
+    def preview_lineage(self):
+        pass
 
     """
     All binary algebraic operations may involve data from different data source
     """
-    @abstractmethod
-    def __add__(self, other): pass
 
     @abstractmethod
-    def __radd__(self, other): pass
+    def __add__(self, other):
+        pass
 
     @abstractmethod
-    def __mul__(self, other): pass
+    def __radd__(self, other):
+        pass
 
     @abstractmethod
-    def __rmul__(self, other): pass
+    def __mul__(self, other):
+        pass
 
     @abstractmethod
-    def __sub__(self, other): pass
+    def __rmul__(self, other):
+        pass
 
     @abstractmethod
-    def __rsub__(self, other): pass
+    def __sub__(self, other):
+        pass
 
     @abstractmethod
-    def __truediv__(self, other): pass
+    def __rsub__(self, other):
+        pass
 
     @abstractmethod
-    def __rtruediv__(self, other): pass
+    def __truediv__(self, other):
+        pass
 
     @abstractmethod
-    def __pow__(self, power, modulo=None): pass
+    def __rtruediv__(self, other):
+        pass
 
     @abstractmethod
-    def __matmul__(self, other): pass
+    def __pow__(self, power, modulo=None):
+        pass
 
     @abstractmethod
-    def __rmatmul__(self, other): pass
+    def __matmul__(self, other):
+        pass
+
+    @abstractmethod
+    def __rmatmul__(self, other):
+        pass
 
     @property
     @abstractmethod
-    def T(self): pass
+    def T(self):
+        pass
 
     @abstractmethod
-    def __getitem__(self, item): pass
+    def __getitem__(self, item):
+        pass
 
-    #WARNING !! Permanently disabled  !
-    #Weakref proxy invokes this function for some reason, which is forcing the dataframe objects to materialize.
-    #@abstractmethod
-    #def __len__(self): pass;
+    # WARNING !! Permanently disabled  !
+    # Weakref proxy invokes this function for some reason, which is forcing the dataframe objects to materialize.
+    # @abstractmethod
+    # def __len__(self): pass;
 
     @property
     @abstractmethod
-    def shape(self): pass
+    def shape(self):
+        pass
 
     @abstractmethod
-    def vstack(self, othersrclist): pass
+    def vstack(self, othersrclist):
+        pass
 
     @abstractmethod
-    def hstack(self, othersrclist, colprefixlist=None): pass
+    def hstack(self, othersrclist, colprefixlist=None):
+        pass
 
     @abstractmethod
-    def describe(self): pass
+    def describe(self):
+        pass
 
     @abstractmethod
-    def sum(self, collist=None): pass
+    def sum(self, collist=None):
+        pass
 
     @abstractmethod
-    def avg(self, collist=None): pass
+    def avg(self, collist=None):
+        pass
 
     @abstractmethod
-    def count(self, collist=None): pass
+    def count(self, collist=None):
+        pass
 
     @abstractmethod
-    def countd(self, collist=None): pass
+    def countd(self, collist=None):
+        pass
 
     @abstractmethod
-    def countn(self, collist=None): pass
+    def countn(self, collist=None):
+        pass
 
     @abstractmethod
-    def max(self, collist=None): pass
+    def max(self, collist=None):
+        pass
 
     @abstractmethod
-    def min(self, collist=None): pass
+    def min(self, collist=None):
+        pass
 
     @abstractmethod
-    def head(self,n=5): pass
+    def head(self, n=5):
+        pass
 
     @abstractmethod
-    def tail(self,n=5): pass
+    def tail(self, n=5):
+        pass
 
     @property
     def data(self):
@@ -198,7 +244,7 @@ class DataFrame:
 
 
 class RemoteTable(DataFrame):
-    def __init__(self, source: DataSource = None, transform: Transform = None, table_name: str=None):
+    def __init__(self, source: DataSource = None, transform: Transform = None, table_name: str = None):
         super().__init__(table_name)
         self._ds_ = source
         self.source_table = table_name
@@ -225,8 +271,6 @@ class RemoteTable(DataFrame):
                     self._columns_[col.name] = col
         return self._columns_
 
-
-
     def _link_table_meta(self):
         """
 
@@ -240,7 +284,7 @@ class RemoteTable(DataFrame):
     def materialize(self):
         self._data_ = sc.execute(self)
         return self._data_
-    
+
     def fillna(self, col, val):
         transform = SQLFillNA(self, col, val)
         return RemoteTable(self.data_source, transform)
@@ -252,8 +296,6 @@ class RemoteTable(DataFrame):
     def drop_duplicates(self):
         transform = SQLDropduplicateTransform(self)
         return RemoteTable(self.data_source, transform)
-
-    
 
     def order(self, orderlist: Union[List[str], str]):
 
@@ -286,6 +328,9 @@ class RemoteTable(DataFrame):
         return RemoteTable(self.source, transform)
 
     def __getitem__(self, key):
+        func_name = '__getitem__'
+        saved_args = {'key': key}
+
         if self._data_ is not None:
             return self._data_[key]
 
@@ -300,14 +345,24 @@ class RemoteTable(DataFrame):
             keys = [key]
 
         trans = SQLProjectionTransform(self, keys)
-        return RemoteTable(self.data_source, trans)
+        tb = RemoteTable(transform=trans)
+        tb._saved_func_name_ = func_name
+        tb._saved_args_ = saved_args
+        return tb
 
-    def merge(self, other, on=None, left_on=None, right_on=None, how='left', suffix=('_x', '_y'), sort=False):
+    def merge(self, other, on=None, left_on=None, right_on=None, how='left', suffixes=('_x', '_y'), sort=False):
+        # save function name and args to be used later for local processing
+        func_name = 'merge'
+        saved_args = {'on': on, 'how': how, 'left_on': left_on, 'right_on': right_on,
+                             'suffixes': suffixes, 'sort': sort}
         if left_on and right_on:
-            trans = SQLJoinTransform(self, other, left_on, right_on, how, suffix)
+            trans = SQLJoinTransform(self, other, left_on, right_on, how, suffixes)
         else:
-            trans = SQLJoinTransform(self, other, on, on, how, suffix)
-        return RemoteTable(transform=trans)
+            trans = SQLJoinTransform(self, other, on, on, how, suffixes)
+        tb = RemoteTable(transform=trans)
+        tb._saved_func_name_ = func_name
+        tb._saved_args_ = saved_args
+        return tb
 
     @property
     def table_name(self):
@@ -341,11 +396,10 @@ class LocalTable(DataFrame):
         self._ds_ = local_ds
         self._stubs_ = []
 
-    @property
-    def genSQL(self):
-        return 'SELECT * FROM ' + self.table_name
-
     def merge(self, other, on=None, left_on=None, right_on=None, how='left', suffix=('_x', '_y'), sort=False):
+        func_name = 'merge'
+        saved_args = {'on': on, 'how': how, 'left_on': left_on, 'right_on': right_on,
+                             'suffixes': suffix, 'sort': sort}
         if isinstance(other, LocalTable):
             return LocalTable(self._data_.merge(other, on, how, left_on=left_on, right_on=right_on,
                                                 suffix=suffix, sort=sort))
@@ -354,6 +408,9 @@ class LocalTable(DataFrame):
                 trans = SQLJoinTransform(self, other, left_on, right_on, how, suffix)
             else:
                 trans = SQLJoinTransform(self, other, on, on, how, suffix)
-            return RemoteTable(transform=trans)
+            tb = RemoteTable(transform=trans)
+            tb._saved_func_name_ = func_name
+            tb._saved_args_ = saved_args
+            return tb
 
 
