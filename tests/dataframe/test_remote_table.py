@@ -111,17 +111,17 @@ class MyTestCase(unittest.TestCase):
         sql3 = q3.transform.genSQL
         self.assertEqual(sql3, "SELECT * FROM couple WHERE couple_id = 100 and sid <> 0 ORDER BY sid asc ")
 
-    # def test_head(self):
-    #     h = self.coup_.head(5)
-    #     self.assertTrue(isinstance(h.transform, SQLHeadTransform))
-    #     sql = h.transform.genSQL
-    #     self.assertEqual(sql, 'SELECT * FROM couple LIMIT 5')
-    #
-    # def test_tail(self):
-    #     t = self.coup_.tail(5)
-    #     self.assertTrue(isinstance(t.transform, SQLTailTransform))
-    #     sql = t.transform.genSQL
-    #     self.assertEqual(sql, 'SELECT * FROM couple LIMIT 5 OFFSET (SELECT COUNT(*) FROM couple) - 5')
+    def test_head(self):
+        h = self.coup_.head(5)
+        self.assertTrue(isinstance(h.transform, SQLHeadTransform))
+        sql = h.transform.genSQL
+        self.assertEqual(sql, 'SELECT * FROM couple LIMIT 5')
+
+    def test_tail(self):
+        t = self.coup_.tail(5)
+        self.assertTrue(isinstance(t.transform, SQLTailTransform))
+        sql = t.transform.genSQL
+        self.assertEqual(sql, 'SELECT * FROM couple LIMIT 5 OFFSET (SELECT COUNT(*) FROM couple) - 5')
 
     def test_rename(self):
         r = self.coup_.rename({"couple_id": "cid"})
@@ -129,5 +129,10 @@ class MyTestCase(unittest.TestCase):
         sql = r.transform.genSQL
         self.assertEqual(sql, 'ALTER TABLE couple couple_id TO cid;')
 
+    def test_aggregate(self):
+        a = self.coup_.aggregate(["couple_id", "hcardid"], "hcardid")
+        self.assertTrue(isinstance(a.transform, SQLAggregateTransform))
+        sql = a.transform.genSQL
+        self.assertEqual(sql, "SELECT couple_id AS couple_id, hcardid AS hcardid FROM (SELECT * FROM couple) couple GROUP BY hcardid")
 if __name__ == '__main__':
     unittest.main()

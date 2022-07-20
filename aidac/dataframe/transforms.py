@@ -5,6 +5,7 @@ import copy
 import weakref
 from collections.abc import Iterable
 from enum import Enum
+from typing import List
 
 from aidac.dataframe import frame
 from aidac.common.column import Column
@@ -119,12 +120,11 @@ class SQLTransform(Transform):
     def sources(self):
         return self._source_
 
-
-class SQLProjectionTransform(SQLTransform):
-    def __init__(self, source, projcols):
+class SQLAggregateTransform(SQLTransform):
+    def __init__(self, source, projcols, groupcols):
         super().__init__(source)
-        self._projcols_ = projcols
-
+        self._projcols_ = projcols if isinstance(projcols, Iterable) else [projcols]
+        self._groupcols_ = groupcols if isinstance(groupcols, List) else [groupcols]
     def _gen_column(self, source):
         if not self._columns_:
             colcount = 0
@@ -182,7 +182,89 @@ class SQLProjectionTransform(SQLTransform):
         for c in self.columns:  # Prepare the list of columns going into the select statement.
             col = self.columns[c]
             projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + ((col.transform.columnExpr if (
-                col.transform) else col.srccol[0]) + ' AS ' + col.name);
+                col.transform) else col.srccol[0]) + ' AS ' + col.name)
+
+        groupcoltxt = None
+
+        for g in self._groupcols_:
+            groupcoltxt = ((groupcoltxt+", ") if groupcoltxt else "") + g
+
+        if not groupcoltxt:
+            sql_text = ('SELECT ' + projcoltxt + ' FROM '
+                        + '(' + self._source_.genSQL + ') ' + self._source_.table_name  # Source table transform SQL.
+                        )
+        else:
+            sql_text =  ('SELECT ' + projcoltxt + ' FROM '
+                        + '(' + self._source_.genSQL + ') ' + self._source_.table_name  # Source table transform SQL.
+                        ) + " GROUP BY " + groupcoltxt
+
+        return sql_text
+
+
+class SQLProjectionTransform(SQLTransform):
+    def __init__(self, source, projcols):
+        super().__init__(source)
+        self._projcols_ = projcols
+
+    def _gen_column(self, source):
+        if not self._columns_:
+            colcount = 0
+
+            def _get_proj_col_info(c: dict | str):
+                nonlocal colcount
+                colcount += 1
+                if isinstance(c, dict):  # check if the projected column is given an alias name
+                    sc1 = list(c.keys())[0]  # get the source column name / function
+                    pc1 = c.get(sc1)  # and the alias name for projection.
+                else:
+                    sc1 = pc1 = c  # otherwise projected column name / function is the same as the source column.
+                # we only consider one possible source column as the renaming is one-one
+                # todo: may need to extend this to use F class
+                srccol = sc1
+                # projected column alias, use the one given, else take it from the expression if it has one, or else generate one.
+                projcol = pc1 if (isinstance(pc1, str)) else (
+                    sc1.columnExprAlias if (hasattr(sc1, 'columnExprAlias')) else 'col_'.format(colcount))
+                # coltransform = sc1 if (isinstance(sc1, F)) else None
+                # todo: extend this to use F class
+                coltransform = None
+                return srccol, projcol, coltransform
+
+            src_cols = source.columns
+            # columns = {};
+            columns = collections.OrderedDict();
+            for col in self._projcols_:
+                srccol, projcoln, coltransform = _get_proj_col_info(col)
+
+                sdbtables = []
+                srccols = []
+                scol = src_cols.get(srccol)
+                if not scol:
+                    raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
+                else:
+                    srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
+                    sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
+
+                column = Column(projcoln, scol.dtype)
+                column.srccol = srccols
+                column.tablename = sdbtables
+                column.transform = coltransform
+                columns[projcoln] = column
+            self._columns_ = columns
+
+
+    @property
+    def columns(self):
+        if not self._columns_:
+            self._gen_column(self._source_)
+        return self._columns_
+
+    @property
+    def genSQL(self):
+        projcoltxt = None
+        for c in self.columns:  # Prepare the list of columns going into the select statement.
+            col = self.columns[c]
+            projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + ((col.transform.columnExpr if (
+                col.transform) else col.srccol[0]) + ' AS ' + col.name)
 
         sql_text = ('SELECT ' + projcoltxt + ' FROM '
                     + '(' + self._source_.genSQL + ') ' + self._source_.table_name  # Source table transform SQL.
@@ -650,12 +732,29 @@ class SQLQuery(SQLTransform):
 
         return query
 
+# class SQLFilterTransform(SQLTransform):
+#     def __init__(self, source, items, like, regex, axis):
+#         self.source = source
+#         self.items = items
+#         self.like = like
+#         self.regex = regex
+#         self.axis = axis
+#
+#     @property
+#     def columns(self):
+#         if not self._columns_:
+#             self._columns_ = self._source_.columns
+#         return self._columns_
+#
+#     @property
+#     def genSQL(self):
 
 class SQLApply(SQLTransform):
     def __init__(self, source, func, axis):
         super().__init__(source)
         self._func_ = func
         self._axis_ = axis
+
 
 
 class SQLDropNA(SQLTransform):

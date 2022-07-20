@@ -346,6 +346,10 @@ class RemoteTable(DataFrame):
             trans = SQLJoinTransform(self, other, on, on, how, suffix)
         return RemoteTable(transform=trans)
 
+    def aggregate(self, projcols, groupcols=None):
+        transform = SQLAggregateTransform(self, projcols, groupcols)
+        return RemoteTable(self.source, transform)
+
     def head(self, n=5):
         transform = SQLHeadTransform(self, n)
         return RemoteTable(self.source, transform)
