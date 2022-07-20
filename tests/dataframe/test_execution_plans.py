@@ -5,7 +5,7 @@ import numpy as np
 
 import aidac
 
-from aidac.dataframe.frame import RemoteTable
+from aidac.dataframe.frame import DataFrame
 from aidac.exec.Executable import *
 
 
@@ -32,7 +32,7 @@ class MyTestCase(unittest.TestCase):
         @return:
         """
         ds = self.mock_ds()
-        station = RemoteTable(source=ds, table_name='mock station')
+        station = DataFrame(ds=ds, table_name='mock station')
         station._columns_ = {'id': Column('id', int, 'mock station', 'mock station', False),
                              'name': Column('name', object, 'mock station', 'mock station', False)}
         proj = station[['id', 'name']]

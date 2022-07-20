@@ -116,7 +116,7 @@ class Executable:
         Need to process all prerequisites and update the lineage
         @return:
         """
-        if isinstance(self.df, frame.LocalTable):
+        if self.df.data is not None:
             return self.df.data
 
         for x in self.prereqs:

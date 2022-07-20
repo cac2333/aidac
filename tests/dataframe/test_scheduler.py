@@ -15,7 +15,7 @@ class MyTestCase(TestDataFrameBase):
     def test_schedule_transfer1(self):
         self.trip = aidac.from_dict({'id': np.asarray([1, 7060, 6203, 6001, 6002]), 'duration': np.asarray([100, 20, 60, 50, 38])})
         proj = self.station[['scode', 'sname']]
-        jn = self.trip.merge(proj, left_on='id', right_on='sname', how='inner')
+        jn = self.trip.merge(proj, left_on='id', right_on='scode', how='inner')
         jn.materialize()
         print(jn.data)
 
