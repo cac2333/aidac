@@ -23,8 +23,24 @@ def create_remote_table(source, table_name):
     return DataFrame(ds=source, table_name=table_name)
 
 
+def local_frame_wrapper(func):
+    def inner(self, *args, **kwargs):
+        func_name = func.__name__
+        if self.data is not None:
+            pd_func = getattr(pd.DataFrame, func_name)
+            pdf = pd_func(self.data, *args, **kwargs)
+            return DataFrame(pdf, ds=local_ds)
+        else:
+            df = func(self, *args, **kwargs)
+            df._saved_func_name_ = func_name
+            df._saved_args_ = args
+            df._saved_kwargs_ = kwargs
+            return df
+    return inner
+
+
 class DataFrame:
-    def __init__(self, table_name=None, data=None, transform=None, ds=None):
+    def __init__(self, data=None, table_name=None, transform=None, ds=None):
         self.__tid__ = 't_' + uuid.uuid4().hex
         self.source_table = table_name
         self._transform_ = transform
@@ -33,30 +49,30 @@ class DataFrame:
         self._stubs_ = []
         self._data_ = data
         self._saved_func_name_ = None
-        self._saved_args_ = {}
+        self._saved_args_ = []
+        self._saved_kwargs_ = {}
 
     """
     override so that any unsupported function call directly go to pandas 
     """
     def __getattr__(self, item):
-        try:
-            at = getattr(DataFrame, item)
-        except KeyError:
-            at = getattr(pd.DataFrame, item)
-            logging.info('Method/attribute {} is not supported in AIDAC dataframe, '
-                         'using pandas instead'.format(item))
+        def dataframe_wrapper(*args, **kwargs):
+            func_name = item
+            if self.data is None:
+                self.materialize()
+            pd_func = getattr(pd.DataFrame, func_name)
+            pdf = pd_func(self.data, *args, **kwargs)
+            return DataFrame(pdf, ds=local_ds)
+        at = dataframe_wrapper
+        print('Method/attribute {} is not supported in AIDAC dataframe, '
+                     'using pandas instead'.format(item))
         return at
 
     def __str__(self):
         return self.table_name
 
+    @local_frame_wrapper
     def __getitem__(self, key):
-        func_name = '__getitem__'
-        saved_args = {'key': key}
-
-        if self._data_ is not None:
-            return DataFrame(data=self._data_[key])
-
         if isinstance(key, DataFrame):
             # todo: selection
             pass
@@ -69,8 +85,6 @@ class DataFrame:
 
         trans = SQLProjectionTransform(self, keys)
         tb = DataFrame(transform=trans, ds=self.data_source)
-        tb._saved_func_name_ = func_name
-        tb._saved_args_ = saved_args
         return tb
 
     def materialize(self):
@@ -157,7 +171,7 @@ class DataFrame:
         else:
             func_name = 'merge'
             saved_args = {'on': on, 'how': how, 'left_on': left_on, 'right_on': right_on,
-                          'suffixes': suffix, 'sort': sort}
+                      'suffixes': suffix, 'sort': sort}
             if left_on and right_on:
                 trans = SQLJoinTransform(self, other, left_on, right_on, how, suffix)
             else:
@@ -166,96 +180,24 @@ class DataFrame:
             tb = DataFrame(transform=trans)
             tb._saved_func_name_ = func_name
             tb._saved_args_ = saved_args
-
         return tb
 
-
-
-    """
-    All binary algebraic operations may involve data from different data source
-    """
-
-
-    @property
-    def shape(self):
-        pass
-
-    @abstractmethod
-    def vstack(self, othersrclist):
-        pass
-
-    @abstractmethod
-    def hstack(self, othersrclist, colprefixlist=None):
-        pass
-
-    @abstractmethod
-    def describe(self):
-        pass
-
-    @abstractmethod
-    def sum(self, collist=None):
-        pass
-
-    @abstractmethod
-    def avg(self, collist=None):
-        pass
-
-    @abstractmethod
-    def count(self, collist=None):
-        pass
-
-    @abstractmethod
-    def countd(self, collist=None):
-        pass
-
-    @abstractmethod
-    def countn(self, collist=None):
-        pass
-
-    @abstractmethod
-    def max(self, collist=None):
-        pass
-
-    @abstractmethod
-    def min(self, collist=None):
-        pass
-
-    @abstractmethod
-    def head(self, n=5):
-        pass
-
-    @abstractmethod
-    def tail(self, n=5):
-        pass
-
-
-class RemoteTable(DataFrame):
-    def __init__(self, source: DataSource = None, transform: Transform = None, table_name: str = None):
-        super().__init__(table_name)
-        self._ds_ = source
-        self.source_table = table_name
-
-        # try retrieve the meta info of the table from data source
-        # if table does not exist, an error will occur
-        self._link_table_meta()
-
-        self._transform_ = transform
-        self._data_ = None
-        self.other_ds = []
-
-
+    @local_frame_wrapper
     def fillna(self, col, val):
         transform = SQLFillNA(self, col, val)
-        return RemoteTable(self.data_source, transform)
+        return DataFrame(ds=self.data_source, transform=transform)
 
+    @local_frame_wrapper
     def dropna(self, col):
         transform = SQLDropNA(self, col)
-        return RemoteTable(self.data_source, transform)
+        return DataFrame(ds=self.data_source, transform=transform)
 
+    @local_frame_wrapper
     def drop_duplicates(self):
         transform = SQLDropduplicateTransform(self)
-        return RemoteTable(self.data_source, transform)
+        return DataFrame(ds=self.data_source, transform=transform)
 
+    @local_frame_wrapper
     def order(self, orderlist: Union[List[str], str]):
 
         if isinstance(orderlist, str):
@@ -266,8 +208,9 @@ class RemoteTable(DataFrame):
             keys = orderlist
 
         transform = SQLOrderTransform(self, keys)
-        return RemoteTable(self.data_source, transform)
+        return DataFrame(self.data_source, transform)
 
+    @local_frame_wrapper
     def groupby(self, by: Union[List[str], str], groupcols: Union[List[str], str, None]):
         if isinstance(by, str):
             by_ = [by]
@@ -286,11 +229,48 @@ class RemoteTable(DataFrame):
         transform = SQLGroupByTransform(self, by_, groupcols_)
         return RemoteTable(self.source, transform)
 
+    def to_dict(self, orient, into):
+        return self._data_.to_dict(orient, into)
+
+    def to_pickle(self, path, compression='infer', protocol=5, storage_options=None):
+        return self._data_.to_pickle(path, compression, protocol, storage_options)
+
+    def to_json(self, path_or_buf=None, orient=None, date_format=None, double_precision=10, force_ascii=True, date_unit='ms',
+            default_handler=None, lines=False, compression = "infer", index=True, indent=None, storage_options=None):
+        return self._data_.to_json(path_or_buf, orient, date_format, double_precision, force_ascii, date_unit, default_handler, lines, compression, index, indent, storage_options)
+
+    def to_string(self, buf=None, columns=None, col_space=None, header=True, index=True, na_rep='NaN', formatters=None, float_format=None, sparsify=None, index_names=True, justify=None, max_rows=None, max_cols=None, show_dimensions=False, decimal='.', line_width=None, min_rows=None, max_colwidth=None, encoding=None):
+       return self._data_.to_string(buf, columns, col_space, header, index, na_rep, formatters, float_format, sparsify, index_names, justify, max_rows, max_cols, show_dimensions, decimal, line_width, min_rows, max_colwidth, encoding)
+
+    def to_csv(self, path_or_buf=None, sep=',', na_rep='', float_format=None, columns=None, header=True, index=True, index_label=None, mode='w', encoding=None, compression='infer', quoting=None, quotechar='"', line_terminator=None, chunksize=None, date_format=None, doublequote=True, escapechar=None, decimal='.', errors='strict', storage_options=None):
+        return self._data_.to_csv(path_or_buf, sep, na_rep, float_format, columns, header, index, index_label, mode, encoding, compression, quoting, quotechar, line_terminator, chunksize, date_format, doublequote, escapechar, decimal, errors, storage_options)
+
+    @classmethod
+    def read_pickle(cls, filepath_or_buffer, compression, dict__, storage_options):
+        return DataFrame(pd.read_pickle(filepath_or_buffer, compression, dict__, storage_options))
+
+    @classmethod
+    def read_orc(cls, path, columns=None, **kwargs):
+        return DataFrame(pd.read_orc(columns, **kwargs))
+
+
+class RemoteTable(DataFrame):
+    def __init__(self, source: DataSource = None, transform: Transform = None, table_name: str = None):
+        super().__init__(table_name)
+        self._ds_ = source
+        self.source_table = table_name
+
+        # try retrieve the meta info of the table from data source
+        # if table does not exist, an error will occur
+        self._link_table_meta()
+
+        self._transform_ = transform
+        self._data_ = None
+        self.other_ds = []
 
 def read_csv(path, delimiter, header, names) -> DataFrame:
     df = pd.read_csv(path, delimiter=delimiter, header=header, names=names)
     return DataFrame(data=df, ds=local_ds)
-
 
 def from_dict(data):
     df = pd.DataFrame(data)

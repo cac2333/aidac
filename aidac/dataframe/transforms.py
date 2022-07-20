@@ -236,6 +236,7 @@ class SQLJoinTransform(SQLTransform):
                     )
 
         return sqlText
+
 class SQLOrderTransform(SQLTransform):
 
     # order does not reformat the columns
@@ -339,6 +340,7 @@ class SQLFillNA(SQLTransform):
 
     def genSQL(self):
         pass
+
 
 class SQLDropduplicateTransform(SQLTransform):
     def __init__(self, source):

@@ -39,6 +39,11 @@ class MyTestCase(TestDataFrameBase):
         print(end-start)
         print(proj.data)
 
+    def test_schedule_local_pd(self):
+        proj = self.station['scode']
+        si = self.station.sort_index()
+        print('')
+
 
 if __name__ == '__main__':
     unittest.main()

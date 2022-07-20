@@ -35,9 +35,6 @@ class MyTestCase(unittest.TestCase):
         dd = jn._data_
         print(dd)
 
-    def test_schdule1(self):
-        proj = self.station['id']
-        proj.materialize()
 
 
 if __name__ == '__main__':
