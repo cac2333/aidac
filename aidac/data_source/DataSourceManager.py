@@ -35,7 +35,7 @@ class DataSourceManager:
         """
         table_ls = {}
         for job, source in self.sources.items():
-            table_ls[job] = self.df.data_source.ls_tables()
+            table_ls[job] = self.source.ls_tables()
         return table_ls
 
     def get_data_source(self, job) -> DataSource:

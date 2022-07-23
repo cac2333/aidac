@@ -5,7 +5,7 @@ from abc import abstractmethod
 import collections
 
 import numpy as np
-from typing import Union, List
+from typing import Union, List, Dict
 
 from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource, local_ds
@@ -208,7 +208,31 @@ class DataFrame:
             keys = orderlist
 
         transform = SQLOrderTransform(self, keys)
-        return DataFrame(self.data_source, transform)
+        return DataFrame(ds=self.data_source, transform=transform)
+
+    def query(self, expr: str):
+        transform = SQLQuery(self, expr)
+        return DataFrame(ds=self.data_source, transform=transform)
+
+    def apply(self, func, axis=0):
+        transform = SQLApply(self, func, axis)
+        return DataFrame(ds=self.data_source, transform=transform)
+
+    def aggregate(self, projcols, groupcols=None):
+        transform = SQLAggregateTransform(self, projcols, groupcols)
+        return DataFrame(ds=self.data_source, transform=transform)
+
+    def head(self, n=5):
+        transform = SQLHeadTransform(self, n)
+        return DataFrame(ds=self.data_source, transform=transform)
+
+    def tail(self, n=5):
+        transform = SQLTailTransform(self, n)
+        return DataFrame(ds=self.data_source, transform=transform)
+
+    def rename(self, columns: Dict):
+        transform = SQLRenameTransform(self, columns)
+        return DataFrame(ds=self.data_source, transform=transform)
 
     @local_frame_wrapper
     def groupby(self, by: Union[List[str], str], groupcols: Union[List[str], str, None]):
@@ -227,7 +251,7 @@ class DataFrame:
             else:
                 groupcols_ = groupcols
         transform = SQLGroupByTransform(self, by_, groupcols_)
-        return RemoteTable(self.source, transform)
+        return DataFrame(ds=self.source, transform=transform)
 
     def to_dict(self, orient, into):
         return self._data_.to_dict(orient, into)
