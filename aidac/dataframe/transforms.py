@@ -214,7 +214,7 @@ class SQLJoinTransform(SQLTransform):
         for c in self.columns:  # Prepare the list of columns going into the select statement.
             col = self.columns[c]
             projcoltxt = ((projcoltxt + ', ') if projcoltxt else '') + (
-                        col.tablename + '.' + col.srccol[0] + ' AS ' + col.name)
+                    col.tablename + '.' + col.srccol[0] + ' AS ' + col.name)
 
         jointxt = None;  # The join condition SQL.
         if (self._jointype_ == 'cross'):
@@ -356,7 +356,9 @@ class SQLGroupByTransform(SQLTransform):
         projcoltxt = None
         for c in self.columns:  # Prepare the list of columns going into the select statement.
             col = self.columns[c]
-            print(str(col))
+            print("colname is ", str(col.name))
+            print("dtype is: ", col.dtype)
+            print("int" in str(col.dtype))
             projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + ((col.transform.genSQL if (
                 col.transform) else col.srccol[0]) + ' AS ' + col.name)
 
@@ -451,6 +453,7 @@ class SQLISNA(SQLTransform):
         super().__init__(source)
         self._targetcols_ = cols
 
+
 class SQLQuery(SQLTransform):
     def __init__(self, source, expr: str):
         super().__init__(source)
@@ -472,20 +475,96 @@ class SQLQuery(SQLTransform):
                 count -= 1
                 continue
 
-            if char == '=' and self._query_[i-1] == '=':
+            if char == '=' and self._query_[i - 1] == '=':
                 continue
 
-            if char == '!' and self._query_[i+1] == "=":
+            if char == '!' and self._query_[i + 1] == "=":
                 count = 1
                 cur += '<>'
                 continue
-
 
             cur += char
 
         query = self._source_.genSQL + ' WHERE ' + cur
 
         return query
+
+
+class SQLFilterTransform(SQLTransform):
+    def __init__(self, source, op, other):
+        super().__init__(source)
+        self._op_ = op
+        self._other_ = other
+
+    @property
+    def columns(self):
+        if not self._columns_:
+            self._columns_ = self._source_.columns
+        return self._columns_
+
+    def is_int(self, o):
+        return isinstance(o, int)
+
+    def is_string(self, o):
+        return isinstance(o, str)
+
+    def is_float(self, o):
+        return isinstance(o, float)
+
+    def is_same_type(self, o1, o2):
+        if self.is_int(o1):
+            return "int" in str(o2)
+        if self.is_float(o1):
+            return "float" in str(o2) or "double" in str(o2) or "single" in str(o2)
+        if self.is_string(o1):
+            return "obj" in str(o2)
+
+    @property
+    def genSQL(self):
+        sqltext = "SELECT "
+
+        op_formula = []
+
+        if self._op_ == "eq":
+            op_formula.append("=")
+            op_formula.append("<>")
+
+        elif self._op_ == "gt":
+            op_formula.append(">")
+            op_formula.append("<>")
+
+        elif self._op_ == "ne":
+            op_formula.append("<>")
+            op_formula.append("=")
+
+        elif self._op_ == "ge":
+            op_formula.append(">=")
+            op_formula.append("<>")
+
+        elif self._op_ == "le":
+            op_formula.append("<=")
+            op_formula.append("<>")
+
+        elif self._op_ == "lt":
+            op_formula.append("<")
+            op_formula.append("<>")
+
+        for c in self.columns:
+            col = self.columns[c]
+            col_type = col.dtype
+            col_name = col.name
+            if self.is_same_type(self._other_, col_type):
+                sqltext += "CASE WHEN " + col_name + " " + op_formula[0] + " " + str(
+                    self._other_) + " THEN TRUE ELSE FALSE END AS " + col_name + ", "
+            else:
+                sqltext += "CASE WHEN" + " 1 " + op_formula[1] + " 1 THEN TRUE ELSE FALSE END AS " + col_name + ", "
+
+        sqltext = sqltext[:-2]
+
+        sqltext += ' FROM ' + '(' + self._source_.genSQL + ') ' + self._source_.table_name  # Source table transform SQL.
+
+        return sqltext
+
 
 class SQLApply(SQLTransform):
     def __init__(self, source):

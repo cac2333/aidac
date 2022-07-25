@@ -307,6 +307,43 @@ class RemoteTable(DataFrame):
         trans = SQLProjectionTransform(self, keys)
         return RemoteTable(self.source, trans)
 
+    def __eq__(self, other):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+            trans = SQLFilterTransform(self, "eq", other)
+            return RemoteTable(self.source, trans)
+        raise ValueError("object comparison is not supported by remotetables")
+
+    def __ge__(self, other):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+            trans = SQLFilterTransform(self, "ge", other)
+            return RemoteTable(self.source, trans)
+        raise ValueError("object comparison is not supported by remotetables")
+
+    def __gt__(self, other):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+            trans = SQLFilterTransform(self, "gt", other)
+            return RemoteTable(self.source, trans)
+        raise ValueError("object comparison is not supported by remotetables")
+
+    def __ne__(self, other):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+            trans = SQLFilterTransform(self, "ne", other)
+            return RemoteTable(self.source, trans)
+        raise ValueError("object comparison is not supported by remotetables")
+
+    def __lt__(self, other):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+            trans = SQLFilterTransform(self, "lt", other)
+            return RemoteTable(self.source, trans)
+        raise ValueError("object comparison is not supported by remotetables")
+
+    def __le__(self, other):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+            trans = SQLFilterTransform(self, "le", other)
+            return RemoteTable(self.source, trans)
+        raise ValueError("object comparison is not supported by remotetables")
+
+
     def merge(self, other, on=None, left_on=None, right_on=None, how='left', suffix=('_x', '_y'), sort=False):
         if left_on and right_on:
             trans = SQLJoinTransform(self, other, left_on, right_on, how, suffix)
