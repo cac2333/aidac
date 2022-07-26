@@ -589,23 +589,3 @@ class LocalTable(DataFrame):
 
     def unstack(self, level=- 1, fill_value=None):
         return LocalTable(self._data_.unstack(level, fill_value))
-
-
-    #
-    # def duplicated(self):
-    #     pass
-    #
-    # def sort_values(self):
-    #     pass
-    #
-    # def append(self):
-    #     pass
-    #
-    # def transpose(self):
-    #     return LocalTable(self._data_.T)
-    #
-    # def shape(self):
-    #     pass
-    #
-    # def apply(self):
-    #     pass

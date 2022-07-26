@@ -2,7 +2,7 @@ import unittest
 import re
 
 import aidac
-from aidac.dataframe.transforms import SQLProjectionTransform
+
 from aidac.dataframe.transforms import *
 
 

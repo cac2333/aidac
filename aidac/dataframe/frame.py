@@ -12,26 +12,86 @@ from aidac.exec.Executable import Executable
 import pandas as pd
 import uuid
 
-
 import aidac.dataframe.Scheduler as Scheduler
+
 sc = Scheduler.Scheduler()
 
 
 def create_remote_table(source, table_name):
-    return RemoteTable(source, table_name=table_name)
+    return DataFrame(ds=source, table_name=table_name)
+
+
+def local_frame_wrapper(func):
+    def inner(self, *args, **kwargs):
+        func_name = func.__name__
+        if self.data is not None:
+            pd_func = getattr(pd.DataFrame, func_name)
+            pdf = pd_func(self.data, *args, **kwargs)
+            return DataFrame(pdf, ds=local_ds)
+        else:
+            df = func(self, *args, **kwargs)
+            df._saved_func_name_ = func_name
+            df._saved_args_ = args
+            df._saved_kwargs_ = kwargs
+            return df
+    return inner
 
 
 class DataFrame:
-    def __init__(self, table_name=None):
-        self.__tid__ = 't_'+uuid.uuid4().hex
+    def __init__(self, data=None, table_name=None, transform=None, ds=None):
+        self.__tid__ = 't_' + uuid.uuid4().hex
         self.source_table = table_name
-        self._transform_ = None
+        self._transform_ = transform
         self._columns_ = None
-        self._ds_ = None
+        self._ds_ = ds
         self._stubs_ = []
-        self._data_ = None
+        self._data_ = data
+        self._saved_func_name_ = None
+        self._saved_args_ = []
+        self._saved_kwargs_ = {}
 
-    def get_data(self):
+    """
+    override so that any unsupported function call directly go to pandas 
+    """
+    def __getattr__(self, item):
+        def dataframe_wrapper(*args, **kwargs):
+            func_name = item
+            if self.data is None:
+                self.materialize()
+            pd_func = getattr(pd.DataFrame, func_name)
+            pdf = pd_func(self.data, *args, **kwargs)
+            return DataFrame(pdf, ds=local_ds)
+        at = dataframe_wrapper
+        print('Method/attribute {} is not supported in AIDAC dataframe, '
+                     'using pandas instead'.format(item))
+        return at
+
+    def __str__(self):
+        return self.table_name
+
+    @local_frame_wrapper
+    def __getitem__(self, key):
+        if isinstance(key, DataFrame):
+            # todo: selection
+            pass
+        if isinstance(key, list):
+            keys = key
+        elif isinstance(key, tuple):
+            raise ValueError("Multi-level index is not supported")
+        else:
+            keys = [key]
+
+        trans = SQLProjectionTransform(self, keys)
+        tb = DataFrame(transform=trans, ds=self.data_source)
+        return tb
+
+    def materialize(self):
+        if self.data is None:
+            sc.execute(self)
+        return self.data
+
+    @property
+    def data(self):
         return self._data_
 
     def clear_lineage(self):
@@ -50,6 +110,16 @@ class DataFrame:
         return self.source_table if self.source_table else self.__tid__
 
     @property
+    def genSQL(self):
+        if self.transform is not None:
+            return self.transform.genSQL
+        else:
+            return 'SELECT * FROM ' + self.table_name
+
+    def add_source(self, ds):
+        self._stubs_.append(ds)
+
+    @property
     def shape(self) -> tuple[int, int]:
         pass
 
@@ -60,17 +130,28 @@ class DataFrame:
     @property
     def columns(self):
         if self._columns_ is None:
-            cols = {}
-            # create columns using pandas index column name and types
-            for cname, ctype in zip(self._data_.dtypes.index, self._data_.dtypes):
-                if isinstance(ctype, np.dtype):
-                    ctype = ctype.type
-                cols[cname] = Column(cname, ctype)
-            return cols
+            if self.data is not None:
+                cols = {}
+                # create columns using pandas index column name and types
+                for cname, ctype in zip(self._data_.dtypes.index, self._data_.dtypes):
+                    if isinstance(ctype, np.dtype):
+                        ctype = ctype.type
+                    cols[cname] = Column(cname, ctype)
+                self._columns_ = cols
+            else:
+                if self.source_table is None:
+                    assert self.transform is not None, "A table without a remote database table linked to it must have a transform"
+                    # materialize column info
+                    self._columns_ = self.transform.columns
+                else:
+                    cols = self.data_source.table_columns(self.source_table)
+                    self._columns_ = collections.OrderedDict()
+                    for col in cols:
+                        self._columns_[col.name] = col
         return self._columns_
 
     @property
-    def source(self):
+    def data_source(self):
         return self._ds_
 
     def __repr__(self) -> str:
@@ -79,182 +160,42 @@ class DataFrame:
         """
         pass
 
-    @abstractmethod
-    def filter(self, exp: str): pass
-
-    @abstractmethod
-    def join(self, other: DataFrame, left_on: list | str, right_on: list | str, join_type: str):
-        pass
-        """
-        May involve mixed data source
-        """
-
-    @abstractmethod
-    def aggregate(self, projcols, groupcols=None): pass
-
-    @abstractmethod
-    def project(self, cols: list | str): pass
-
-    @abstractmethod
-    def order(self, orderlist): pass
-
-    @abstractmethod
-    def distinct(self): pass
-
-    @abstractmethod
-    def preview_lineage(self): pass
-
-    """
-    All binary algebraic operations may involve data from different data source
-    """
-    @abstractmethod
-    def __add__(self, other): pass
-
-    @abstractmethod
-    def __radd__(self, other): pass
-
-    @abstractmethod
-    def __mul__(self, other): pass
-
-    @abstractmethod
-    def __rmul__(self, other): pass
-
-    @abstractmethod
-    def __sub__(self, other): pass
-
-    @abstractmethod
-    def __rsub__(self, other): pass
-
-    @abstractmethod
-    def __truediv__(self, other): pass
-
-    @abstractmethod
-    def __rtruediv__(self, other): pass
-
-    @abstractmethod
-    def __pow__(self, power, modulo=None): pass
-
-    @abstractmethod
-    def __matmul__(self, other): pass
-
-    @abstractmethod
-    def __rmatmul__(self, other): pass
-
-    @property
-    @abstractmethod
-    def T(self): pass
-
-    @abstractmethod
-    def __getitem__(self, item): pass
-
-    #WARNING !! Permanently disabled  !
-    #Weakref proxy invokes this function for some reason, which is forcing the dataframe objects to materialize.
-    #@abstractmethod
-    #def __len__(self): pass;
-
-    @property
-    @abstractmethod
-    def shape(self): pass
-
-    @abstractmethod
-    def vstack(self, othersrclist): pass
-
-    @abstractmethod
-    def hstack(self, othersrclist, colprefixlist=None): pass
-
-    @abstractmethod
-    def describe(self): pass
-
-    @abstractmethod
-    def sum(self, collist=None): pass
-
-    @abstractmethod
-    def avg(self, collist=None): pass
-
-    @abstractmethod
-    def count(self, collist=None): pass
-
-    @abstractmethod
-    def countd(self, collist=None): pass
-
-    @abstractmethod
-    def countn(self, collist=None): pass
-
-    @abstractmethod
-    def max(self, collist=None): pass
-
-    @abstractmethod
-    def min(self, collist=None): pass
-
-    @abstractmethod
-    def head(self,n=5): pass
-
-    @abstractmethod
-    def tail(self,n=5): pass
-
-    @property
-    def data(self):
-        return self._data_
-
-
-class RemoteTable(DataFrame):
-    def __init__(self, source: DataSource = None, transform: Transform = None, table_name: str=None):
-        super().__init__(table_name)
-        self._ds_ = source
-        self.source_table = table_name
-
-        # try retrieve the meta info of the table from data source
-        # if table does not exist, an error will occur
-        self._link_table_meta()
-
-        self._transform_ = transform
-        self._data_ = None
-        self.other_ds = []
-
-    @property
-    def columns(self):
-        if not self._columns_:
-            if self.source_table is None:
-                assert self.transform is not None, "A table without a remote database table linked to it must have a transform"
-                # materialize column info
-                self._columns_ = self.transform.columns
+    def merge(self, other, on=None, left_on=None, right_on=None, how='left', suffix=('_x', '_y'), sort=False):
+        # local table, eager execution
+        if self.data is not None and other.data is not None:
+            rs = self.data.merge(other.data, on, how, left_on=left_on, right_on=right_on,
+                                                suffix=suffix, sort=sort)
+            tb = DataFrame(data=rs, ds=local_ds)
+        else:
+            func_name = 'merge'
+            saved_args = {'on': on, 'how': how, 'left_on': left_on, 'right_on': right_on,
+                      'suffixes': suffix, 'sort': sort}
+            if left_on and right_on:
+                trans = SQLJoinTransform(self, other, left_on, right_on, how, suffix)
             else:
-                cols = self.source.table_columns(self.source_table)
-                self._columns_ = collections.OrderedDict()
-                for col in cols:
-                    self._columns_[col.name] = col
-        return self._columns_
+                trans = SQLJoinTransform(self, other, on, on, how, suffix)
 
+            tb = DataFrame(transform=trans)
+            tb._saved_func_name_ = func_name
+            tb._saved_args_ = saved_args
+        return tb
 
-
-    def _link_table_meta(self):
-        """
-
-        @return:
-        """
-        pass
-
-    def __str__(self):
-        return self.table_name
-
-    def materialize(self):
-        self._data_ = sc.execute(self)
-        return self._data_
-    
+    @local_frame_wrapper
     def fillna(self, col, val):
         transform = SQLFillNA(self, col, val)
-        return RemoteTable(self.source, transform)
+        return DataFrame(ds=self.data_source, transform=transform)
 
+    @local_frame_wrapper
     def dropna(self, col):
         transform = SQLDropNA(self, col)
-        return RemoteTable(self.source, transform)
+        return DataFrame(ds=self.data_source, transform=transform)
 
+    @local_frame_wrapper
     def drop_duplicates(self):
         transform = SQLDropduplicateTransform(self)
-        return RemoteTable(self.source, transform)
+        return DataFrame(ds=self.data_source, transform=transform)
 
-    
-
+    @local_frame_wrapper
     def order(self, orderlist: Union[List[str], str]):
 
         if isinstance(orderlist, str):
@@ -265,13 +206,38 @@ class RemoteTable(DataFrame):
             keys = orderlist
 
         transform = SQLOrderTransform(self, keys)
-        return RemoteTable(self.source, transform)
+        return DataFrame(ds=self.data_source, transform=transform)
 
     def query(self, expr: str):
         transform = SQLQuery(self, expr)
-        return RemoteTable(self.source, transform)
+        return DataFrame(ds=self.data_source, transform=transform)
+
+    def apply(self, func, axis=0):
+        transform = SQLApply(self, func, axis)
+        return DataFrame(ds=self.data_source, transform=transform)
+
+    def aggregate(self, projcols, groupcols=None):
+        transform = SQLAggregateTransform(self, projcols, groupcols)
+        return DataFrame(ds=self.data_source, transform=transform)
+
+    def head(self, n=5):
+        transform = SQLHeadTransform(self, n)
+        return DataFrame(ds=self.data_source, transform=transform)
+
+    def tail(self, n=5):
+        transform = SQLTailTransform(self, n)
+        return DataFrame(ds=self.data_source, transform=transform)
+
+    def rename(self, columns: Dict):
+        transform = SQLRenameTransform(self, columns)
+        return DataFrame(ds=self.data_source, transform=transform)
 
 
+    def query(self, expr: str):
+        transform = SQLQuery(self, expr)
+        return DataFrame(self.source, transform)
+
+    @local_frame_wrapper
     def groupby(self, by: Union[List[str], str], groupcols: Union[List[str], str, None]):
         if isinstance(by, str):
             by_ = [by]
@@ -288,116 +254,94 @@ class RemoteTable(DataFrame):
             else:
                 groupcols_ = groupcols
         transform = SQLGroupByTransform(self, by_, groupcols_)
-        return RemoteTable(self.source, transform)
+        return DataFrame(ds=self.source, transform=transform)
 
-    def __getitem__(self, key):
-        if self._data_ is not None:
-            return self._data_[key]
+    def to_dict(self, orient, into):
+        return self._data_.to_dict(orient, into)
 
-        if isinstance(key, DataFrame):
-            # todo: selection
-            pass
-        if isinstance(key, list):
-            keys = key
-        elif isinstance(key, tuple):
-            raise ValueError("Multi-level index is not supported")
-        else:
-            keys = [key]
+    def to_pickle(self, path, compression='infer', protocol=5, storage_options=None):
+        return self._data_.to_pickle(path, compression, protocol, storage_options)
 
-        trans = SQLProjectionTransform(self, keys)
-        return RemoteTable(self.source, trans)
+    def to_json(self, path_or_buf=None, orient=None, date_format=None, double_precision=10, force_ascii=True, date_unit='ms',
+            default_handler=None, lines=False, compression = "infer", index=True, indent=None, storage_options=None):
+        return self._data_.to_json(path_or_buf, orient, date_format, double_precision, force_ascii, date_unit, default_handler, lines, compression, index, indent, storage_options)
 
     def __eq__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "eq", other)
-            return RemoteTable(self.source, trans)
+            return DataFrame(self.source, trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     def __ge__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "ge", other)
-            return RemoteTable(self.source, trans)
+            return DataFrame(self.source, trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     def __gt__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "gt", other)
-            return RemoteTable(self.source, trans)
+            return DataFrame(self.source, trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     def __ne__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "ne", other)
-            return RemoteTable(self.source, trans)
+            return DataFrame(self.source, trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     def __lt__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "lt", other)
-            return RemoteTable(self.source, trans)
+            return DataFrame(self.source, trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     def __le__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "le", other)
-            return RemoteTable(self.source, trans)
+            return DataFrame(self.source, trans)
         raise ValueError("object comparison is not supported by remotetables")
 
+    def to_string(self, buf=None, columns=None, col_space=None, header=True, index=True, na_rep='NaN', formatters=None, float_format=None, sparsify=None, index_names=True, justify=None, max_rows=None, max_cols=None, show_dimensions=False, decimal='.', line_width=None, min_rows=None, max_colwidth=None, encoding=None):
+       return self._data_.to_string(buf, columns, col_space, header, index, na_rep, formatters, float_format, sparsify, index_names, justify, max_rows, max_cols, show_dimensions, decimal, line_width, min_rows, max_colwidth, encoding)
 
-    def merge(self, other, on=None, left_on=None, right_on=None, how='left', suffix=('_x', '_y'), sort=False):
-        if left_on and right_on:
-            trans = SQLJoinTransform(self, other, left_on, right_on, how, suffix)
-        else:
-            trans = SQLJoinTransform(self, other, on, on, how, suffix)
-        return RemoteTable(transform=trans)
+    def to_csv(self, path_or_buf=None, sep=',', na_rep='', float_format=None, columns=None, header=True, index=True, index_label=None, mode='w', encoding=None, compression='infer', quoting=None, quotechar='"', line_terminator=None, chunksize=None, date_format=None, doublequote=True, escapechar=None, decimal='.', errors='strict', storage_options=None):
+        return self._data_.to_csv(path_or_buf, sep, na_rep, float_format, columns, header, index, index_label, mode, encoding, compression, quoting, quotechar, line_terminator, chunksize, date_format, doublequote, escapechar, decimal, errors, storage_options)
 
+    @classmethod
+    def read_pickle(cls, filepath_or_buffer, compression, dict__, storage_options):
+        return DataFrame(pd.read_pickle(filepath_or_buffer, compression, dict__, storage_options))
 
 
     @property
     def table_name(self):
         return self.source_table if self.source_table else self.__tid__
 
-    @property
-    def genSQL(self):
-        if self.transform is not None:
-            return self.transform.genSQL
-        else:
-            return 'SELECT * FROM ' + self.table_name
-
-    def add_source(self, ds):
-        self.other_sources.append(ds)
+    @classmethod
+    def read_orc(cls, path, columns=None, **kwargs):
+        return DataFrame(pd.read_orc(columns, **kwargs))
 
 
-def read_csv(path, delimiter, header, names) -> LocalTable:
+class RemoteTable(DataFrame):
+    def __init__(self, source: DataSource = None, transform: Transform = None, table_name: str = None):
+        super().__init__(table_name)
+        self._ds_ = source
+        self.source_table = table_name
+
+        # try retrieve the meta info of the table from data source
+        # if table does not exist, an error will occur
+        self._link_table_meta()
+
+        self._transform_ = transform
+        self._data_ = None
+        self.other_ds = []
+
+def read_csv(path, delimiter, header, names) -> DataFrame:
     df = pd.read_csv(path, delimiter=delimiter, header=header, names=names)
-    return LocalTable(df)
-
+    return DataFrame(data=df, ds=local_ds)
 
 def from_dict(data):
     df = pd.DataFrame(data)
-    return LocalTable(df)
-
-
-class LocalTable(DataFrame):
-    def __init__(self, data, table_name=None):
-        super().__init__(table_name)
-        self._data_ = data
-        self._ds_ = local_ds
-        self._stubs_ = []
-
-    @property
-    def genSQL(self):
-        return 'SELECT * FROM ' + self.table_name
-
-    def merge(self, other, on=None, left_on=None, right_on=None, how='left', suffix=('_x', '_y'), sort=False):
-        if isinstance(other, LocalTable):
-            return LocalTable(self._data_.merge(other, on, how, left_on=left_on, right_on=right_on,
-                                                suffix=suffix, sort=sort))
-        else:
-            if left_on and right_on:
-                trans = SQLJoinTransform(self, other, left_on, right_on, how, suffix)
-            else:
-                trans = SQLJoinTransform(self, other, on, on, how, suffix)
-            return RemoteTable(transform=trans)
+    return DataFrame(data=df, ds=local_ds)
 
 
