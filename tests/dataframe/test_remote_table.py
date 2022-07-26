@@ -68,8 +68,7 @@ class MyTestCase(unittest.TestCase):
 
     def test_group_by(self):
         group_by = self.coup_.groupby("sid", ["sid"])
-        data = group_by.get_data()
-        print(f"data is {data}")
+
         self.assertTrue(isinstance(group_by.transform, SQLGroupByTransform))
         sql = group_by.transform.genSQL
         self.assertEqual(sql, 'SELECT sid AS sid FROM (SELECT * FROM couple) couple GROUP BY sid')

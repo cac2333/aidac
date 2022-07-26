@@ -3,7 +3,7 @@ from abc import abstractmethod
 import collections
 
 import numpy as np
-from typing import Union, List
+from typing import Union, List, Dict
 
 from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource, local_ds
@@ -181,12 +181,12 @@ class DataFrame:
         return tb
 
     @local_frame_wrapper
-    def fillna(self, col, val):
+    def fillna(self, col=[], val=0):
         transform = SQLFillNA(self, col, val)
         return DataFrame(ds=self.data_source, transform=transform)
 
     @local_frame_wrapper
-    def dropna(self, col):
+    def dropna(self, col=[]):
         transform = SQLDropNA(self, col)
         return DataFrame(ds=self.data_source, transform=transform)
 
@@ -208,34 +208,35 @@ class DataFrame:
         transform = SQLOrderTransform(self, keys)
         return DataFrame(ds=self.data_source, transform=transform)
 
+    @local_frame_wrapper
     def query(self, expr: str):
         transform = SQLQuery(self, expr)
         return DataFrame(ds=self.data_source, transform=transform)
 
+    @local_frame_wrapper
     def apply(self, func, axis=0):
         transform = SQLApply(self, func, axis)
         return DataFrame(ds=self.data_source, transform=transform)
 
+    @local_frame_wrapper
     def aggregate(self, projcols, groupcols=None):
         transform = SQLAggregateTransform(self, projcols, groupcols)
         return DataFrame(ds=self.data_source, transform=transform)
 
+    @local_frame_wrapper
     def head(self, n=5):
         transform = SQLHeadTransform(self, n)
         return DataFrame(ds=self.data_source, transform=transform)
 
+    @local_frame_wrapper
     def tail(self, n=5):
         transform = SQLTailTransform(self, n)
         return DataFrame(ds=self.data_source, transform=transform)
 
+    @local_frame_wrapper
     def rename(self, columns: Dict):
         transform = SQLRenameTransform(self, columns)
         return DataFrame(ds=self.data_source, transform=transform)
-
-
-    def query(self, expr: str):
-        transform = SQLQuery(self, expr)
-        return DataFrame(self.source, transform)
 
     @local_frame_wrapper
     def groupby(self, by: Union[List[str], str], groupcols: Union[List[str], str, None]):
@@ -254,7 +255,7 @@ class DataFrame:
             else:
                 groupcols_ = groupcols
         transform = SQLGroupByTransform(self, by_, groupcols_)
-        return DataFrame(ds=self.source, transform=transform)
+        return DataFrame(ds=self.data_source, transform=transform)
 
     def to_dict(self, orient, into):
         return self._data_.to_dict(orient, into)
@@ -266,40 +267,46 @@ class DataFrame:
             default_handler=None, lines=False, compression = "infer", index=True, indent=None, storage_options=None):
         return self._data_.to_json(path_or_buf, orient, date_format, double_precision, force_ascii, date_unit, default_handler, lines, compression, index, indent, storage_options)
 
+    @local_frame_wrapper
     def __eq__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "eq", other)
-            return DataFrame(self.source, trans)
+            return DataFrame(self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
+    @local_frame_wrapper
     def __ge__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "ge", other)
-            return DataFrame(self.source, trans)
+            return DataFrame(self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
+    @local_frame_wrapper
     def __gt__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "gt", other)
-            return DataFrame(self.source, trans)
+            return DataFrame(self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
+    @local_frame_wrapper
     def __ne__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "ne", other)
-            return DataFrame(self.source, trans)
+            return DataFrame(self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
+    @local_frame_wrapper
     def __lt__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "lt", other)
-            return DataFrame(self.source, trans)
+            return DataFrame(self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
+    @local_frame_wrapper
     def __le__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "le", other)
-            return DataFrame(self.source, trans)
+            return DataFrame(self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     def to_string(self, buf=None, columns=None, col_space=None, header=True, index=True, na_rep='NaN', formatters=None, float_format=None, sparsify=None, index_names=True, justify=None, max_rows=None, max_cols=None, show_dimensions=False, decimal='.', line_width=None, min_rows=None, max_colwidth=None, encoding=None):
