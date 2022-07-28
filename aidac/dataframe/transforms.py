@@ -543,10 +543,10 @@ class SQLInsertTransform(SQLTransform):
 
 
 class SQLGroupByTransform(SQLTransform):
-    def __init__(self, source, projectcols, groupcols=None):
+    def __init__(self, source, groupcols, sort):
         super().__init__(source)
-        self._projectcols_ = projectcols
-        self._groupcols_ = groupcols
+        self._groupcols_ = [groupcols] if isinstance(groupcols, str) else groupcols
+        self.sort = sort
 
     def _gen_column(self, source):
 
@@ -579,7 +579,7 @@ class SQLGroupByTransform(SQLTransform):
             src_cols = source.columns
 
             columns = collections.OrderedDict()
-            for col in self._projectcols_:
+            for col in self._groupcols_:
                 srccol, projcoln, coltransform = _get_proj_col_info(col)
 
                 sdbtables = []
@@ -622,11 +622,17 @@ class SQLGroupByTransform(SQLTransform):
             for g in self._groupcols_:
                 groupcoltxt = ((groupcoltxt + ', ') if (groupcoltxt) else '') + g
 
-        sqlText = ('SELECT ' + projcoltxt + ' FROM '
+        sort_coltxt = None
+        if self.sort:
+            for col in self._groupcols_:
+                sort_coltxt = ((sort_coltxt + ", ") if (sort_coltxt) else "") + col
+
+        sqlText = ('SELECT ' + projcoltxt +' FROM '
                    + '(' + self._source_.genSQL + ') ' + self._source_.table_name  # Source table transform SQL.
-                   + ((' GROUP BY ' + groupcoltxt) if (groupcoltxt) else '')
+                   + ((' GROUP BY ' + groupcoltxt) if (groupcoltxt) else '' ) + ((" ORDER BY " + sort_coltxt) if self.sort else '')
                    )
         return sqlText
+
 
 
 class SQLFillNA(SQLTransform):

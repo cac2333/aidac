@@ -67,16 +67,16 @@ class MyTestCase(unittest.TestCase):
     #     proj.materialize()
 
     def test_group_by(self):
-        group_by = self.coup_.groupby("sid", ["sid"])
+        group_by = self.coup_.groupby("sid")
 
         self.assertTrue(isinstance(group_by.transform, SQLGroupByTransform))
         sql = group_by.transform.genSQL
-        self.assertEqual(sql, 'SELECT sid AS sid FROM (SELECT * FROM couple) couple GROUP BY sid')
-        gb = self.midwife_.groupby(["iid", "email"], ["iid", "email"])
+        self.assertEqual(sql, 'SELECT sid AS sid FROM (SELECT * FROM couple) couple GROUP BY sid ORDER BY sid')
+        gb = self.midwife_.groupby(["iid", "email"])
         self.assertTrue(isinstance(gb.transform, SQLGroupByTransform))
         sql = gb.transform.genSQL
         self.assertEqual(sql,
-                         "SELECT iid AS iid, email AS email FROM (SELECT * FROM midwife) midwife GROUP BY iid, email")
+                         "SELECT iid AS iid, email AS email FROM (SELECT * FROM midwife) midwife GROUP BY iid, email ORDER BY iid, email")
 
     def test_fillna(self):
         fillna = self.coup_.fillna()
