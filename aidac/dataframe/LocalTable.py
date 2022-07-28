@@ -519,6 +519,7 @@ class LocalTable(DataFrame):
     def mod(self, other:DataFrame, axis='columns', level=None, fill_value=None):
         return LocalTable(self._data_.__mod__(other.get_data(), axis, level, fill_value))
 
+
     def dot(self, other):
         return LocalTable(self._data_.dot(other.get_data()))
 

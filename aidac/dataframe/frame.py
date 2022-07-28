@@ -236,6 +236,7 @@ class DataFrame:
         transform = SQLTailTransform(self, n)
         return DataFrame(ds=self.data_source, transform=transform)
 
+
     @local_frame_wrapper
     def rename(self, columns: Dict):
         transform = SQLRenameTransform(self, columns)

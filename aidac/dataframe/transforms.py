@@ -550,6 +550,7 @@ class SQLGroupByTransform(SQLTransform):
 
     def _gen_column(self, source):
 
+
         if not self._columns_:
 
             colcount = 0
