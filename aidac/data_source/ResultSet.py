@@ -18,7 +18,7 @@ class ResultSet:
 
     def get_value(self):
         """
-        get the first result tuple
+        get the first result tuple, return a single value if there is only 1 col and 1 row
         @return:
         """
         rs = self.data

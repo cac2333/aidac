@@ -67,7 +67,8 @@ class Executable:
         self.df = df
         self.prereqs = []
         self.planned_job = None
-        self.estimation = None
+        self.estimated_row = None
+        self.estimated_width = None
         # result set sent back required
         self.rs_required = False
 
@@ -99,7 +100,7 @@ class Executable:
             data1 = self.perform_local_operation(sources[0])
             data2 = self.perform_local_operation(sources[1])
             func = getattr(pd.DataFrame, df._saved_func_name_)
-            data = func(data1, data2, **df._saved_args_)
+            data = func(data1, data2, **df._saved_kwargs_)
         else:
             if sources.data is None:
                 data = self.perform_local_operation(sources)
@@ -108,7 +109,7 @@ class Executable:
             func = getattr(pd.DataFrame, df._saved_func_name_)
             print(df._saved_args_)
             print(data.columns)
-            data = func(data, **df._saved_args_)
+            data = func(data, *df._saved_args_, **df._saved_kwargs_)
         return data
 
     def process(self):
@@ -151,6 +152,11 @@ class Executable:
                 x.rs_required = self.rs_required
                 return all_paths
         else:
+            # as we have no prereqs, all data has to be in the same database. Thus we can directly use genSQL
+            self.estimated_row, self.estimated_width = \
+                self.df.data_source.get_estimation(self.df.genSQL)
+            # total cost = 0, path = job_name
+            # todo: explore all possible data sources
             return [(0, Node(self.df.data_source.job_name, None))]
 
     def add_prereq(self, *other: list[Executable]):
@@ -332,7 +338,6 @@ class ScheduleExecutable(Executable):
             path = x.plan()
             all_path.append(path)
         return self.find_local_transfer_costs(all_path)
-
 
     def find_local_transfer_costs(self, prev_dest=[]):
         """compute the transfer cost for all possible data transferring at the local level

@@ -53,7 +53,7 @@ class DataFrame:
         self._saved_kwargs_ = {}
 
     """
-    override so that any unsupported function call directly go to pandas 
+    override so that any unsupported function call directly goes to pandas 
     """
     def __getattr__(self, item):
         def dataframe_wrapper(*args, **kwargs):
@@ -179,7 +179,7 @@ class DataFrame:
 
             tb = DataFrame(transform=trans)
             tb._saved_func_name_ = func_name
-            tb._saved_args_ = saved_args
+            tb._saved_kwargs_ = saved_args
         return tb
 
     @local_frame_wrapper

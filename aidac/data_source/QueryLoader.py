@@ -60,3 +60,6 @@ class QueryLoader:
 
     def get_hist(self, table, column):
         return self.load_query('column_hist').format(table, column)
+
+    def get_estimation(self, qry):
+        return self.load_query('estimate_size').format(qry)

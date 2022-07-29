@@ -27,8 +27,8 @@ class MyTestCase(unittest.TestCase):
                               )
         self.station = aidac.read_remote_data('p1', 'couple')
         self.coup_ = aidac.read_remote_data("p2", "couple")
-        self.users = aidac.read_remote_data('p1', 'users')
-        self.review = aidac.read_remote_data('p1', 'review')
+        # self.trip = aidac.read_remote_data('p1', 'tripdata2017')
+        # self.station = aidac.read_remote_data('p1', 'stations2017')
 
     def test_remote_project1(self):
         proj1 = self.station[['couple_id', 'hcardid', 'sid']]

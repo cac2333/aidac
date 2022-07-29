@@ -63,6 +63,9 @@ class DataSource:
     def get_hist(self, table_name:str, column_name:str):
         pass
 
+    def get_estimation(self, qry):
+        pass
+
 
 class LocalDataSource(DataSource):
     def __init__(self):

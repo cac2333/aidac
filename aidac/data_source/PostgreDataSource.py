@@ -22,6 +22,7 @@ typeConverter = {np.int8: 'TINYINT', np.int16: 'SMALLINT', np.int32: 'INT', np.i
     , 'date': 'DATE', 'time': 'TIME', 'timestamp': 'TIMESTAMP'};
 
 typeConverter_rev = {'integer': np.int32, 'character varying': np.object, 'double precision': np.float64,
+                     'numeric': np.float, 'character': np.object,
                      'boolean': bool, 'date': 'date', 'timestamp without time zone': 'timestamp'}
 
 constant_converter = {'YES': True, 'NO': False}
@@ -33,6 +34,7 @@ class PostgreDataSource(DataSource):
 
         self.__conn = psycopg.connect(
             f'''host={self.host} 
+            port={self.port} 
             dbname={self.dbname} 
             user={self.username} 
             password={self.password}'''
@@ -103,6 +105,10 @@ class PostgreDataSource(DataSource):
         # need to calculate the actual distinct values
         n_distinct = self.row_count(table_name) * (-n_distinct)
         return table_name, null_frac, n_distinct, mcv
+
+    def get_estimation(self, qry):
+        qry = ql.get_estimation(qry)
+        return self._execute(qry).get_value()
 
     def _execute(self, qry) -> ResultSet | None:
         self.__cursor.execute(qry)

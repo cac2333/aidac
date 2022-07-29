@@ -17,7 +17,7 @@ def tables():
     manager.tables()
 
 
-def read_csv(path, delimiter=None, header=None, names=None):
+def read_csv(path, delimiter=',', header='infer', names=None):
     return frame.read_csv(path, delimiter, header, names)
 
 
