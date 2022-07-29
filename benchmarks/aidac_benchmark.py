@@ -28,8 +28,23 @@ def my_query_01():
     o = read_file('orders')
     l = pd.read_remote_data('p1', 'lineitem')
     t = o.merge(l, left_on='o_orderkey', right_on='l_orderkey')
-    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority'), ('l_orderkey', 'o_orderdate', 'o_shippriority')).sum(min_count=1)
+    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority'))
     return t
+
+def my_query_02():
+    """
+    203.76
+    (q_03) get the revenue for orders before 1995-03-15. order join with lineitem
+    @param db:
+    @return:
+    """
+    o = read_file('orders')
+    l = pd.read_remote_data('p1', 'lineitem')
+    l1 = l.query("l_returnflag=='N'")
+    t = o.merge(l1, left_on='o_orderkey', right_on='l_orderkey')
+    t1 = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority'))
+    t1.materialize()
+    return t1
 
 def q_01_v1(db):
     l = db.get_table('lineitem')
@@ -58,11 +73,11 @@ def q_01_v2(db):
 
 def measure_time(func, *args):
     start = time.time()
-    func(*args)
+    rs = func(*args)
     end = time.time()
     print('Function {} takes time {}'.format(func, end-start))
 
 
 if __name__ == '__main__':
     connect('localhost', 'sf01', 'sf01', 6000, 'sf01', 'sf01')
-    measure_time(my_query_01)
+    measure_time(my_query_02)

@@ -54,6 +54,6 @@ estimate_size:
         END LOOP;
     END
     $$ LANGUAGE plpgsql;
-    SELECT * FROM count_estimate('{}')
+    SELECT * FROM count_estimate($a${}$a$);
     
     

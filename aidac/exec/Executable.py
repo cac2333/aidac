@@ -153,8 +153,9 @@ class Executable:
                 return all_paths
         else:
             # as we have no prereqs, all data has to be in the same database. Thus we can directly use genSQL
-            self.estimated_row, self.estimated_width = \
-                self.df.data_source.get_estimation(self.df.genSQL)
+            if self.df.data_source.job_name != LOCAL_DS:
+                self.estimated_row, self.estimated_width = \
+                    self.df.data_source.get_estimation(self.df.genSQL)
             # total cost = 0, path = job_name
             # todo: explore all possible data sources
             return [(0, Node(self.df.data_source.job_name, None))]
