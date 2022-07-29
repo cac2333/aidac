@@ -6,7 +6,7 @@ import pandas
 from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource
 from aidac.data_source.QueryLoader import QueryLoader
-import psycopg
+import psycopg2
 from psycopg2.extensions import register_adapter, AsIs
 
 from aidac.data_source.ResultSet import ResultSet
@@ -32,7 +32,7 @@ class PostgreDataSource(DataSource):
     def connect(self):
         self.port = 5432 if self.port is None else self.port
 
-        self.__conn = psycopg.connect(
+        self.__conn = psycopg2.connect(
             f'''host={self.host} 
             port={self.port} 
             dbname={self.dbname} 

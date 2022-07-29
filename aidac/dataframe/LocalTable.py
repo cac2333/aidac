@@ -9,7 +9,7 @@ import re
 from pandas._libs.lib import NoDefault
 
 from aidac.common.column import Column
-from aidac.dataframe import DataFrame
+from aidac.dataframe.frame import DataFrame
 
 
 # TODO: add compatible for other DataFrame types
@@ -301,6 +301,8 @@ class LocalTable(DataFrame):
     def squeeze(self, axis=None):
         return LocalTable(self._data_.squeeze(axis))
 
+
+
     @classmethod
     # def join(self, other, left_on: Union[list, str], right_on: Union[list, str], join_type: str):
         # '''
@@ -516,6 +518,7 @@ class LocalTable(DataFrame):
 
     def mod(self, other:DataFrame, axis='columns', level=None, fill_value=None):
         return LocalTable(self._data_.__mod__(other.get_data(), axis, level, fill_value))
+
 
     def dot(self, other):
         return LocalTable(self._data_.dot(other.get_data()))

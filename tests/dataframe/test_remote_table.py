@@ -2,10 +2,12 @@ import unittest
 import re
 
 import aidac
+
 from aidac.dataframe.transforms import *
 
 
 class MyTestCase(unittest.TestCase):
+
     def setUp(self) -> None:
         from tests.ds_config import PG_CONFIG
         config = PG_CONFIG
@@ -27,8 +29,9 @@ class MyTestCase(unittest.TestCase):
                               )
         self.station = aidac.read_remote_data('p1', 'couple')
         self.coup_ = aidac.read_remote_data("p2", "couple")
-        # self.trip = aidac.read_remote_data('p1', 'tripdata2017')
-        # self.station = aidac.read_remote_data('p1', 'stations2017')
+        self.midwife_ = aidac.read_remote_data("p1", "midwife")
+        self.users = aidac.read_remote_data('p1', 'users')
+        self.review = aidac.read_remote_data('p1', 'review')
 
     def test_remote_project1(self):
         proj1 = self.station[['couple_id', 'hcardid', 'sid']]
@@ -63,11 +66,18 @@ class MyTestCase(unittest.TestCase):
     #     proj = self.station['sid']
     #     proj.materialize()
 
+
     def test_group_by(self):
-        group_by = self.coup_.groupby("sid", ["sid"])
+        group_by = self.coup_.groupby("sid")
+
         self.assertTrue(isinstance(group_by.transform, SQLGroupByTransform))
         sql = group_by.transform.genSQL
-        self.assertEqual(sql, 'SELECT sid AS sid FROM (SELECT * FROM couple) couple GROUP BY sid')
+        self.assertEqual(sql, 'SELECT sid AS sid FROM (SELECT * FROM couple) couple GROUP BY sid ORDER BY sid')
+        gb = self.midwife_.groupby(["iid", "email"])
+        self.assertTrue(isinstance(gb.transform, SQLGroupByTransform))
+        sql = gb.transform.genSQL
+        self.assertEqual(sql,
+                         "SELECT iid AS iid, email AS email FROM (SELECT * FROM midwife) midwife GROUP BY iid, email ORDER BY iid, email")
 
     def test_fillna(self):
         fillna = self.coup_.fillna()
@@ -105,32 +115,67 @@ class MyTestCase(unittest.TestCase):
         self.assertTrue(isinstance(q2.transform, SQLQuery))
         sql2 = q2.transform.genSQL
         self.assertEqual(sql2, "SELECT * FROM couple WHERE couple_id = 100 and sid <> 0")
-        q3 = q2.order("sid")
-        sql3 = q3.transform.genSQL
-        self.assertEqual(sql3, "SELECT * FROM couple WHERE couple_id = 100 and sid <> 0 ORDER BY sid asc ")
 
-    def test_head(self):
-        h = self.coup_.head(5)
-        self.assertTrue(isinstance(h.transform, SQLHeadTransform))
-        sql = h.transform.genSQL
-        self.assertEqual(sql, 'SELECT * FROM couple LIMIT 5')
+    def test_eq(self):
+        eq = self.midwife_ == 6
+        self.assertTrue(isinstance(eq.transform, SQLFilterTransform))
+        sql = eq.transform.genSQL
+        self.assertEqual(sql, "SELECT CASE WHEN prac_id = 6 THEN TRUE ELSE FALSE END AS prac_id,"
+                              " CASE WHEN 1 <> 1 THEN TRUE ELSE FALSE END AS email, CASE WHEN "
+                              "1 <> 1 THEN TRUE ELSE FALSE END AS name, CASE WHEN phone = 6 THEN"
+                              " TRUE ELSE FALSE END AS phone, CASE WHEN iid = 6 THEN TRUE ELSE F"
+                              "ALSE END AS iid FROM (SELECT * FROM midwife) midwife")
 
-    def test_tail(self):
-        t = self.coup_.tail(5)
-        self.assertTrue(isinstance(t.transform, SQLTailTransform))
-        sql = t.transform.genSQL
-        self.assertEqual(sql, 'SELECT * FROM couple LIMIT 5 OFFSET (SELECT COUNT(*) FROM couple) - 5')
+    def test_ne(self):
+        ne = self.midwife_ != 6
+        self.assertTrue(isinstance(ne.transform, SQLFilterTransform))
+        sql = ne.transform.genSQL
+        self.assertEqual(sql, "SELECT CASE WHEN prac_id <> 6 THEN TRUE ELSE FALSE END AS prac_id,"
+                              " CASE WHEN 1 = 1 THEN TRUE ELSE FALSE END AS email, CASE WHEN 1"
+                              " = 1 THEN TRUE ELSE FALSE END AS name, CASE WHEN phone <> 6 THEN "
+                              "TRUE ELSE FALSE END AS phone, CASE WHEN iid <> 6 THEN TRUE ELSE FA"
+                              "LSE END AS iid FROM (SELECT * FROM midwife) midwife")
 
-    def test_rename(self):
-        r = self.coup_.rename({"couple_id": "cid"})
-        self.assertTrue(isinstance(r.transform, SQLRenameTransform))
-        sql = r.transform.genSQL
-        self.assertEqual(sql, 'ALTER TABLE couple couple_id TO cid;')
+    def test_gt(self):
+        gt = self.midwife_ > 6
+        self.assertTrue(isinstance(gt.transform, SQLFilterTransform))
+        sql = gt.transform.genSQL
+        self.assertEqual(sql, "SELECT CASE WHEN prac_id > 6 THEN TRUE ELSE FALSE END AS prac_id,"
+                              " CASE WHEN 1 <> 1 THEN TRUE ELSE FALSE END AS email, CASE WHEN 1"
+                              " <> 1 THEN TRUE ELSE FALSE END AS name, CASE WHEN phone > 6 THEN "
+                              "TRUE ELSE FALSE END AS phone, CASE WHEN iid > 6 THEN TRUE ELSE FA"
+                              "LSE END AS iid FROM (SELECT * FROM midwife) midwife")
 
-    def test_aggregate(self):
-        a = self.coup_.aggregate(["couple_id", "hcardid"], "hcardid")
-        self.assertTrue(isinstance(a.transform, SQLAggregateTransform))
-        sql = a.transform.genSQL
-        self.assertEqual(sql, "SELECT couple_id AS couple_id, hcardid AS hcardid FROM (SELECT * FROM couple) couple GROUP BY hcardid")
+    def test_ge(self):
+        ge = self.midwife_ >= 6
+        self.assertTrue(isinstance(ge.transform, SQLFilterTransform))
+        sql = ge.transform.genSQL
+        self.assertEqual(sql, "SELECT CASE WHEN prac_id >= 6 THEN TRUE ELSE FALSE END AS prac_id,"
+                              " CASE WHEN 1 <> 1 THEN TRUE ELSE FALSE END AS email, CASE WHEN 1"
+                              " <> 1 THEN TRUE ELSE FALSE END AS name, CASE WHEN phone >= 6 THEN "
+                              "TRUE ELSE FALSE END AS phone, CASE WHEN iid >= 6 THEN TRUE ELSE FA"
+                              "LSE END AS iid FROM (SELECT * FROM midwife) midwife")
+
+    def test_le(self):
+        le = self.midwife_ <= 6
+        self.assertTrue(isinstance(le.transform, SQLFilterTransform))
+        sql = le.transform.genSQL
+        self.assertEqual(sql, "SELECT CASE WHEN prac_id <= 6 THEN TRUE ELSE FALSE END AS prac_id,"
+                              " CASE WHEN 1 <> 1 THEN TRUE ELSE FALSE END AS email, CASE WHEN 1"
+                              " <> 1 THEN TRUE ELSE FALSE END AS name, CASE WHEN phone <= 6 THEN "
+                              "TRUE ELSE FALSE END AS phone, CASE WHEN iid <= 6 THEN TRUE ELSE FA"
+                              "LSE END AS iid FROM (SELECT * FROM midwife) midwife")
+
+    def test_lt(self):
+        ge = self.midwife_ < 6
+        self.assertTrue(isinstance(ge.transform, SQLFilterTransform))
+        sql = ge.transform.genSQL
+        self.assertEqual(sql, "SELECT CASE WHEN prac_id < 6 THEN TRUE ELSE FALSE END AS prac_id,"
+                              " CASE WHEN 1 <> 1 THEN TRUE ELSE FALSE END AS email, CASE WHEN 1"
+                              " <> 1 THEN TRUE ELSE FALSE END AS name, CASE WHEN phone < 6 THEN "
+                              "TRUE ELSE FALSE END AS phone, CASE WHEN iid < 6 THEN TRUE ELSE FA"
+                              "LSE END AS iid FROM (SELECT * FROM midwife) midwife")
+
+
 if __name__ == '__main__':
     unittest.main()

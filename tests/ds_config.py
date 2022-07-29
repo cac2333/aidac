@@ -1,9 +1,7 @@
 PG_CONFIG = {
-    'host': 'localhost',
-    'dbname': 'myDB',
+    'host': '127.0.0.1',
+    'dbname': 'aida',
     'user': 'postgres',
-    'passwd': 'postgres',
+    'passwd': '1758',
     'port': '5432'
 }
-
-"""(Keep cached data in db, only delete when python object is deleted, master->main?)"""
