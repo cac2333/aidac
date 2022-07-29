@@ -270,6 +270,11 @@ class DataFrame:
                                    default_handler, lines, compression, index, indent, storage_options)
 
     @local_frame_wrapper
+    def agg(self, func, collist = []):
+        trans = SQLAGG_Transform(self, func, collist)
+        return DataFrame(self.data_source, transform=trans)
+
+    @local_frame_wrapper
     def __eq__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "eq", other)

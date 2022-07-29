@@ -677,6 +677,89 @@ class SQLFillNA(SQLTransform):
 
         return sqltext
 
+class SQLAGG_Transform(SQLTransform):
+
+    def __init__(self, source, func, collist):
+        super().__init__(source)
+        self.func = func
+        self.collist = collist if len(collist) != 0 else self._source_.columns
+
+    @property
+    def columns(self):
+        if not self._columns_:
+            self._gen_column(self._source_)
+        return self._columns_
+
+    def _gen_column(self, source):
+
+
+        if not self._columns_:
+
+            colcount = 0
+
+            def _get_proj_col_info(c: dict | str):
+                print(f"the input c's looking: {c}")
+
+                nonlocal colcount
+                colcount += 1
+                if isinstance(c, dict):  # check if the projected column is given an alias name
+                    sc1 = list(c.keys())[0]  # get the source column name / function
+                    pc1 = c.get(sc1)  # and the alias name for projection.
+                else:
+                    sc1 = c  # otherwise projected column name / function is the same as the source column.
+                # we only consider one possible source column as the renaming is one-one
+                    pc1 = str(self.func) + "_" + c
+
+                # todo: may need to extend this to use F class
+                srccol = sc1
+                # projected column alias, use the one given, else take it from the expression if it has one, or else generate one.
+                projcol = pc1 if (isinstance(pc1, str)) else (
+                    sc1.columnExprAlias if (hasattr(sc1, 'columnExprAlias')) else 'col_'.format(colcount))
+                # coltransform = sc1 if (isinstance(sc1, F)) else None
+                # todo: extend this to use F class
+                coltransform = None
+                return srccol, projcol, coltransform
+
+            src_cols = source.columns
+
+            columns = collections.OrderedDict()
+            for col in self.collist:
+                srccol, projcoln, coltransform = _get_proj_col_info(col)
+
+                sdbtables = []
+                srccols = []
+                scol = src_cols.get(srccol)
+                print(f"scol is {scol}")
+                if not scol:
+                    raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
+                else:
+                    srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
+                    sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
+
+                column = Column(projcoln, scol.dtype)
+                column.srccol = srccols
+                column.tablename = sdbtables
+                column.transform = coltransform
+                columns[projcoln] = column
+            self._columns_ = columns
+
+    @property
+    def genSQL(self):
+
+        targetcol = None
+        if len(self.collist) == 0:
+            targetcol = "(*)"
+        projcoltxt = None
+        for c in self.columns:
+            col = self.columns[c]
+            projcoltxt = (( projcoltxt + ", ") if (projcoltxt) else '') + (( self.func +'('+col.transform.genSQL + ')' if (col.transform)
+                else self.func +'('+col.srccol[0] + ')') + " AS " + col.name)
+
+        sqlText = ("SELECT " + projcoltxt + " FROM "
+                    + "(" + self._source_.genSQL +") " + self._source_.table_name)
+
+        return sqlText
+
 
 class SQLDropduplicateTransform(SQLTransform):
 

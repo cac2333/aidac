@@ -176,6 +176,12 @@ class MyTestCase(unittest.TestCase):
                               "TRUE ELSE FALSE END AS phone, CASE WHEN iid < 6 THEN TRUE ELSE FA"
                               "LSE END AS iid FROM (SELECT * FROM midwife) midwife")
 
+    def test_agg(self):
+        ag = self.midwife_.agg("count", ["name", "iid"])
+        self.assertTrue(isinstance(ag.transform, SQLAGG_Transform))
+        sql = ag.transform.genSQL
+        self.assertEqual(sql, "SELECT count(name) AS count_name, count(iid) AS count_iid FROM (SELECT * FROM midwife) midwife")
+
 
 if __name__ == '__main__':
     unittest.main()
