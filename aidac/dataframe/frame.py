@@ -216,7 +216,7 @@ class DataFrame:
         return DataFrame(ds=self.data_source, transform=transform)
 
     @local_frame_wrapper
-    def order(self, orderlist: Union[List[str], str], ascending = True):
+    def sort_values(self, orderlist: Union[List[str], str], ascending = True):
 
         if isinstance(orderlist, str):
             keys = [orderlist]
