@@ -444,10 +444,11 @@ class SQLRenameTransform(SQLTransform):
 class SQLOrderTransform(SQLTransform):
 
     # order does not reformat the columns
-    def __init__(self, source, orderlist):
+    def __init__(self, source, orderlist, ascending):
         super().__init__(source)
 
         self._order_ = orderlist
+        self.ascending = ascending
 
     def _gen_column(self, source):
         pass
@@ -474,19 +475,22 @@ class SQLOrderTransform(SQLTransform):
 
         key_res = ''
         sort_order = ''
-        print(ordered_col)
-        for key_ in range(len(ordered_col)):
-            key = ordered_col[key_]
-            if key.endswith("#asc"):
-                key_res = key[:-4]
-                sort_order = 'asc'
-            elif key.endswith("#desc"):
-                key_res = key[:-5]
-                sort_order = 'desc'
-            else:
-                key_res = key
-                sort_order = 'asc'
-            sql_text += key_res + ' ' + sort_order + ' '
+        # print(ordered_col)
+        # for key_ in range(len(ordered_col)):
+        #     key = ordered_col[key_]
+        #     if key.endswith("#asc"):
+        #         key_res = key[:-4]
+        #         sort_order = 'asc'
+        #     elif key.endswith("#desc"):
+        #         key_res = key[:-5]
+        #         sort_order = 'desc'
+        #     else:
+        #         key_res = key
+        #         sort_order = 'asc'
+        #     sql_text += key_res + ' ' + sort_order + ' '
+        for key_ in ordered_col:
+            sql_text = sql_text + key_ + ' ' + (('asc') if self.ascending else 'desc') + ', '
+        sql_text = sql_text[:-2]
         return self._source_.genSQL + ' ' + sql_text
 
 

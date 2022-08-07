@@ -57,10 +57,10 @@ class MyTestCase(unittest.TestCase):
         print(dd)
 
     def test_order_by(self):
-        order_ = self.coup_.order("sid")
+        order_ = self.coup_.sort_values(["sid", "hcardid"])
         self.assertTrue(isinstance(order_.transform, SQLOrderTransform))
         sql = order_.transform.genSQL
-        self.assertEqual(sql, 'SELECT * FROM couple ORDER BY sid asc ')
+        self.assertEqual(sql, 'SELECT * FROM couple ORDER BY sid asc, hcardid asc')
 
     # def test_schdule1(self):
     #     proj = self.station['sid']
@@ -182,6 +182,9 @@ class MyTestCase(unittest.TestCase):
         sql = ag.transform.genSQL
         self.assertEqual(sql, "SELECT count(name) AS count_name, count(iid) AS count_iid FROM (SELECT * FROM midwife) midwife")
 
-
+    def test_project(self):
+        pj = self.midwife_[self.midwife_["name"] != "dsf"]
+        sql = pj.transform.genSQL
+        self.assertEqual(sql, "")
 if __name__ == '__main__':
     unittest.main()
