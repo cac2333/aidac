@@ -61,5 +61,11 @@ class QueryLoader:
     def get_hist(self, table, column):
         return self.load_query('column_hist').format(table, column)
 
+    def create_estimation_func(self):
+        return self.load_query('create_estimate_size')
+
+    def drop_estimation_func(self):
+        return self.load_query('drop_estimate_size')
+
     def get_estimation(self, qry):
         return self.load_query('estimate_size').format(qry)

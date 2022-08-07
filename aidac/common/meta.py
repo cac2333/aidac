@@ -4,8 +4,8 @@ class MetaInfo:
             cols = []
 
         self.cols = cols
-        if cols:
-            self.ncols = len(cols)
-        else:
+        if ncols:
             self.ncols = ncols
+        else:
+            self.ncols = len(cols)
         self.nrows = nrows

@@ -40,17 +40,46 @@ def my_query_01():
     """
     # local orders
     o = read_file('orders')
-    # remote merge
     l = my_db.get_table('lineitem')
-    t = o.merge(l, left_on='o_orderkey', right_on='l_orderkey')
-    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority'), sort=False).sum()
+    t = o.merge(l, left_on='o_orderkey', right_on='l_orderkey')[['l_orderkey', 'o_orderdate', 'o_shippriority']]
+    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority')).agg('count')
+    print(t)
     return t
 
-def q_01_v1(db):
-    l = db.get_table('lineitem')
-    l = l[l['l_shipdate'] <= datetime.date(1998, 9, 2)]
-    disc_price = l['l_extendedprice'] * (1 - l['l_discount'])
-    charge = l['disc_price'] * (1 + l['l_tax'])
+def my_query_01_r():
+    """
+    66.72
+    (q_03) get the revenue for orders before 1995-03-15. order join with lineitem
+    plan = (postgres -> (local, postgres))
+    @param db:
+    @return:
+    """
+    l = read_file('lineitem')
+    o = my_db.get_table('orders')
+    t = o.merge(l, left_on='o_orderkey', right_on='l_orderkey')
+    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority')).agg('count')
+    return t
+
+def my_query_02():
+    """
+    256.23
+    (q_03) get the revenue for orders before 1995-03-15. order join with lineitem
+    @param db:
+    @return:
+    """
+    o = read_file('orders')
+    l = my_db.get_table('lineitem')
+    pivot_date = datetime.date(1998, 9, 2)
+    l = l[l['l_shipdate'] < pivot_date]
+    t = o.merge(l, left_on='o_orderkey', right_on='l_orderkey')[['l_orderkey', 'o_orderdate', 'o_shippriority']]
+    return t
+
+def q_01_v1():
+    """291"""
+    l = pd.read_remote_data('p1', 'lineitem')
+    l = l.query(f'l_shipdate <= \'1998-9-2\'')
+    l.sort_values(['l_returnflag', 'l_linestatus'])
+    return l
 
 
 def q_01_v2(db):
@@ -70,15 +99,34 @@ def q_01_v2(db):
     l.sort_values(['l_returnflag', 'l_linestatus'], inplace=True)
     return l
 
+def q_03_v1():
+    o = read_file('orders')
+    o = o.query('o_orderdate < \'1995-3-15\'')
+    c = my_db.get_table('customer')
+
+    l = my_db.get_table('lineitem')
+    c = c.query('c_mktsegment == \'BUILDING\'')
+    o = o[['o_orderdate', 'o_shippriority', 'o_orderkey', 'o_custkey']]
+    l = l[l['l_shipdate'] > datetime.date(1995, 3, 15)]
+    # l['revenue'] = l['l_extendedprice'] * (1 - l['l_discount'])
+    l = l[['l_orderkey', 'l_extendedprice']]
+
+    t = c.merge(o, left_on='c_custkey', right_on='o_custkey')
+    t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey')
+    t = t[['l_orderkey', 'l_extendedprice', 'o_orderdate', 'o_shippriority']]
+    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority')).agg('sum')
+
+    return t
 
 def measure_time(func, *args):
     start = time.time()
-    func(*args)
+    rs = func(*args)
     end = time.time()
+    print(rs)
     print('Function {} takes time {}'.format(func, end-start))
 
 
 my_db = Database('localhost', 'sf01', 'sf01', 6000, 'sf01', 'sf01')
 
 if __name__ == '__main__':
-    measure_time(my_query_01)
+    measure_time(q_03_v1)

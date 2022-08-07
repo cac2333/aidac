@@ -1,4 +1,6 @@
 import datetime
+import marshal
+import pickle
 import time
 
 import psycopg
@@ -17,67 +19,101 @@ def connect(host, dbname, schema, port, user, pwd):
 def read_file(table):
     return pd.read_csv(_PATH+table+'.csv')
 
+class My_UDF_Class:
+    def my_func(self, a, b):
+        return a+ b
+
+def udf_func():
+    import dill
+    def my_udf(a, b):
+        return a+b
+    serilaized = marshal.dumps(my_udf.__code__)
+    ds = aidac.manager.get_data_source('p1')
+    print(serilaized)
+    ds._execute('''INSERT INTO my_funcs VALUES ('my_udf', %s)''', serilaized)
+
 
 def my_query_01():
     """
-    203.76
+    140.88
     (q_03) get the revenue for orders before 1995-03-15. order join with lineitem
+    plan = (postgres -> (local, postgres))
     @param db:
     @return:
     """
     o = read_file('orders')
     l = pd.read_remote_data('p1', 'lineitem')
     t = o.merge(l, left_on='o_orderkey', right_on='l_orderkey')
-    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority'))
+    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority')).agg('count')
+    return t
+
+def my_query_01_r():
+    """
+    69.96 (40.60 + 4.41)
+    (q_03) get the revenue for orders before 1995-03-15. order join with lineitem
+    plan = (postgres -> (local, postgres))
+    @param db:
+    @return:
+    """
+    l = read_file('lineitem')
+    o = pd.read_remote_data('p1', 'orders')
+    t = o.merge(l, left_on='o_orderkey', right_on='l_orderkey')
+    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority')).agg('count')
     return t
 
 def my_query_02():
     """
-    203.76
-    (q_03) get the revenue for orders before 1995-03-15. order join with lineitem
-    @param db:
-    @return:
-    """
+    209+38"""
     o = read_file('orders')
     l = pd.read_remote_data('p1', 'lineitem')
-    l1 = l.query("l_returnflag=='N'")
-    t = o.merge(l1, left_on='o_orderkey', right_on='l_orderkey')
-    t1 = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority'))
-    t1.materialize()
-    return t1
+    l = l.query(f'l_shipdate < \'1998-9-2\'')
+    t = o.merge(l, left_on='o_orderkey', right_on='l_orderkey')[['l_orderkey', 'o_orderdate', 'o_shippriority']]
+    return t
 
-def q_01_v1(db):
-    l = db.get_table('lineitem')
-    l = l[l['l_shipdate'] <= datetime.date(1998, 9, 2)]
-    disc_price = l['l_extendedprice'] * (1 - l['l_discount'])
-    charge = l['disc_price'] * (1 + l['l_tax'])
-
-
-def q_01_v2(db):
-    l = db.lineitem
-    l = l[l['l_shipdate'] <= datetime.date(1998, 9, 2)]
-    l['disc_price'] = l['l_extendedprice'] * (1 - l['l_discount'])
-    l['charge'] = l['disc_price'] * (1 + l['l_tax'])
-    l = l[['l_returnflag', 'l_linestatus', 'l_quantity', 'l_extendedprice', 'disc_price', 'charge', 'l_discount']]
-    l = l.groupby(('l_returnflag', 'l_linestatus'), sort=False) \
-        .agg({'l_quantity': ['sum', 'mean'], 'l_extendedprice': ['sum', 'mean'], 'disc_price': 'sum',
-        'charge': 'sum', 'l_discount': ['mean', 'count']})
-    l.columns = pd.Index([l.columns.levels[1][l.columns.labels[1][i]] + '_' + l.columns.levels[0][l.columns.labels[0][i]] for i in range(len(l.columns.labels[0]))])
-    l.rename(columns={'sum_l_quantity': 'sum_qty', 'sum_l_extendedprice': 'sum_base_price',
-        'mean_l_quantity': 'avg_qty', 'mean_l_extendedprice': 'avg_price',
-        'mean_l_discount': 'avg_disc', 'count_l_discount': 'count_order'}, inplace=True)
-    l.reset_index(inplace=True)
-    l.sort_values(['l_returnflag', 'l_linestatus'], inplace=True)
+def q_01_v1():
+    l = pd.read_remote_data('p1', 'lineitem')
+    l = l.query(f'l_shipdate <= \'1998-9-2\'')
+    l.sort_values(['l_returnflag', 'l_linestatus'])
     return l
 
+def q_01_v2():
+    """209+38"""
+    o = read_file('orders')
+    l = pd.read_remote_data('p1', 'lineitem')
+    l = l.query(f'l_shipdate < \'1998-9-2\'')
+    t = o.merge(l, left_on='o_orderkey', right_on='l_orderkey')[['l_orderkey', 'o_orderdate', 'o_shippriority']]
+    return t
+
+def q_03_v1():
+    c = pd.read_remote_data('p1', 'customer')
+    o = pd.read_remote_data('p1', 'orders')
+    l = pd.read_remote_data('p1', 'lineitem')
+    c = c.query('c_mktsegment == \'BUILDING\'')['c_custkey']
+    o = o.query('o_orderdate < \'1995-3-15\'')
+    o = o[['o_orderdate', 'o_shippriority', 'o_orderkey', 'o_custkey']]
+    l = l.query('l_shipdate > \'1995, 3, 15\'')
+    # l['revenue'] = l['l_extendedprice'] * (1 - l['l_discount'])
+    l = l[['l_orderkey', 'l_extendedprice']]
+
+    t = c.merge(o, left_on='c_custkey', right_on='o_custkey')
+    t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey')
+    t = t[['l_orderkey', 'l_extendedprice', 'o_orderdate', 'o_shippriority']]
+    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority')).agg('sum', ['l_extendedprice'])
+    # t.sort_values(['revenue', 'o_orderdate'], ascending=[False, True], inplace=True)
+    # t.sort_values(['l_extendedprice', 'o_orderdate'], ascending=[False, True])
+    print(t.genSQL)
+    return t
 
 def measure_time(func, *args):
     start = time.time()
-    rs = func(*args)
+    rs = func(*args).materialize()
+    # rs = rs.materilazie()
     end = time.time()
+    print(rs)
     print('Function {} takes time {}'.format(func, end-start))
 
 
 if __name__ == '__main__':
     connect('localhost', 'sf01', 'sf01', 6000, 'sf01', 'sf01')
-    measure_time(my_query_02)
+    measure_time(q_03_v1)
+    # udf_func()

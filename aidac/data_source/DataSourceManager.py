@@ -47,6 +47,9 @@ class DataSourceManager:
     def send_data(self, origin: str, dest: str):
         pass
 
+    def all_data_sources(self):
+        return self.sources.keys()
+
 
 class DataSourceFactory:
     def __init__(self):

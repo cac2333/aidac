@@ -6,7 +6,7 @@ import pandas
 from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource
 from aidac.data_source.QueryLoader import QueryLoader
-import psycopg2
+import psycopg
 from psycopg2.extensions import register_adapter, AsIs
 
 from aidac.data_source.ResultSet import ResultSet
@@ -17,7 +17,7 @@ ql = QueryLoader(DS)
 register_adapter(np.int32, AsIs)
 register_adapter(np.int64, AsIs)
 
-typeConverter = {np.int8: 'TINYINT', np.int16: 'SMALLINT', np.int32: 'INT', np.int64: 'BIGINT'
+typeConverter = { np.int8: 'TINYINT', np.int16: 'SMALLINT', np.int32: 'INT', np.int64: 'NUMERIC'
     , np.float32: 'FLOAT', np.float64: 'FLOAT', np.object: 'VARCHAR(100)', np.object_: 'VARCHAR(100)', bytearray: 'BLOB'
     , 'date': 'DATE', 'time': 'TIME', 'timestamp': 'TIMESTAMP'};
 
@@ -32,7 +32,7 @@ class PostgreDataSource(DataSource):
     def connect(self):
         self.port = 5432 if self.port is None else self.port
 
-        self.__conn = psycopg2.connect(
+        self.__conn = psycopg.connect(
             f'''host={self.host} 
             port={self.port} 
             dbname={self.dbname} 
@@ -54,7 +54,7 @@ class PostgreDataSource(DataSource):
         with self.__cursor.copy(ql.copy_data(table, column_name)) as copy:
             for row in data:
                 copy.write_row(row)
-        print(start-time.time())
+        # print(start-time.time())
 
     def table_columns(self, table: str):
         qry = ql.table_columns(table)
@@ -84,6 +84,7 @@ class PostgreDataSource(DataSource):
         col_def = []
         for cname, col in cols.items():
             db_type = typeConverter[col.dtype]
+            # print(f'converting: {col.dtype} -> {db_type}')
             col_def.append(str(cname)+' '+db_type)
         col_def = ', '.join(col_def)
 
@@ -107,6 +108,8 @@ class PostgreDataSource(DataSource):
         return table_name, null_frac, n_distinct, mcv
 
     def get_estimation(self, qry):
+        self._execute(ql.drop_estimation_func())
+        self._execute(ql.create_estimation_func())
         qry = ql.get_estimation(qry)
         return self._execute(qry).get_value()
 
@@ -117,4 +120,14 @@ class PostgreDataSource(DataSource):
             # todo: change column type here
             rs = ResultSet(self.__cursor.description, self.__cursor.fetchall())
             return rs
+        return None
+
+    def _execute(self, qry, *args) -> ResultSet | None:
+        self.__cursor.execute(qry, args)
+        if self.__cursor.description is not None:
+            # as no record returned for insert, update queries
+            # todo: change column type here
+            rs = ResultSet(self.__cursor.description, self.__cursor.fetchall())
+            return rs
+        self.__conn.commit()
         return None

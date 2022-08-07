@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import weakref
 from collections.abc import Iterable
 
 from aidac.data_source.DataSourceManager import manager
@@ -57,7 +58,7 @@ class Scheduler:
                     if isinstance(sources, frame.DataFrame):
                         stack.append(sources)
                     else:
-                        sblock = ScheduleExecutable(cur)
+                        sblock = ScheduleExecutable(weakref.proxy(cur), ex1)
                         for s in sources:
                             # todo: check if source in the same data source as current
                             sblock.add_prereq(_gen_pipe(s))
@@ -67,6 +68,7 @@ class Scheduler:
         ex = _gen_pipe(df)
         root_ex = RootExecutable()
         root_ex.add_prereq(ex)
-        root_ex.plan()
+        my_plan = root_ex.plan()
+        print(my_plan)
         return root_ex.process()
 

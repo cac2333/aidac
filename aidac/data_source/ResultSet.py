@@ -47,7 +47,11 @@ class ResultSet:
                 tp = object
             od[col.name] = np.empty(len(self.data), dtype=tp)
             for idx2, row in enumerate(self.data):
-                od[col.name][idx2] = row[idx1]
+                try:
+                    od[col.name][idx2] = row[idx1]
+                except (ValueError, TypeError):
+                    # print(f'column: {col}, row_value={row[idx1]}')
+                    pass
         return od
 
 

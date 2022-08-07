@@ -3,6 +3,8 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 
+import time
+
 from aidac.common.DataIterator import generator
 from aidac.common.column import Column
 from aidac.common.hist import Histgram
@@ -106,10 +108,10 @@ class Executable:
                 data = self.perform_local_operation(sources)
             else:
                 data = sources.data
-            func = getattr(pd.DataFrame, df._saved_func_name_)
-            print(df._saved_args_)
-            print(data.columns)
-            data = func(data, *df._saved_args_, **df._saved_kwargs_)
+            func = getattr(data, df._saved_func_name_)
+            # print(df._saved_args_)
+            # print(data.columns)
+            data = func(*df._saved_args_, **df._saved_kwargs_)
         return data
 
     def process(self):
@@ -123,8 +125,7 @@ class Executable:
         for x in self.prereqs:
             x.process()
 
-        import time
-        print('process, planned job={}'.format(self.planned_job))
+        # print('process, planned job={}'.format(self.planned_job))
         start = time.time()
         if self.planned_job == LOCAL_DS:
             assert self.to_be_executed_locally(self.df)
@@ -132,13 +133,11 @@ class Executable:
         else:
             sql = self.df.genSQL
             print('sql generated: \n{}'.format(sql))
-            print(time.time() - start)
             ds = manager.get_data_source(self.planned_job)
             rs = ds._execute(sql)
-            print('returned')
-            print(time.time() - start)
+            returned = time.time()
             data = rs.get_result_table()
-            print(time.time()-start)
+            print('sql time = {}, conversion time = {}'.format(returned-start, time.time()-returned))
             data = pd.DataFrame(data)
         self.clear_lineage()
         self.df._data_ = data
@@ -156,6 +155,10 @@ class Executable:
             if self.df.data_source.job_name != LOCAL_DS:
                 self.estimated_row, self.estimated_width = \
                     self.df.data_source.get_estimation(self.df.genSQL)
+            # if the data is local, then we have the actual data
+            else:
+                self.estimated_row = len(self.df._data_)
+                self.estimated_width = len(self.df.columns) * 4 # todo: compute the actual size
             # total cost = 0, path = job_name
             # todo: explore all possible data sources
             return [(0, Node(self.df.data_source.job_name, None))]
@@ -190,14 +193,21 @@ class TransferExecutable(Executable):
         scols = src.columns
         # todo: check for duplicate names
         if dest != LOCAL_DS:
+            start = time.time()
             dest_ds = manager.get_data_source(dest)
             dest_ds.create_table(src.table_name, scols)
             dest_ds.import_table(src.table_name, scols, generator(src.data))
+            print(f'transfer takes time {time.time()-start}')
         # todo: decide if a local stub should be created
 
     def removable(self):
+        # todo: recursively check the tree
+        for x in self.prereqs:
+            x.pre_process()
         if self.prereqs[0].planned_job == self.dest:
-            return self.prereqs[0]
+            return True, self.prereqs[0].prereqs
+        else:
+            return False, []
 
     def process(self):
         """
@@ -228,7 +238,7 @@ class RootExecutable(Executable):
     def _get_lowest_cost_path(self, paths):
         lowest, opt_path = paths[0]
         for cost, path in paths:
-            if lowest < cost:
+            if cost < lowest:
                 lowest = cost
                 opt_path = path
         return opt_path
@@ -244,13 +254,13 @@ class RootExecutable(Executable):
                     # reach the end
                     return
 
-                # insert transfer block at the schedule block
+            # insert transfer block at the schedule block
             transfer_blocks = []
             for x, p in zip(cur.prereqs, path.children):
                 te = TransferExecutable(x.df, prereqs=[x], dest=path.val)
                 transfer_blocks.append(te)
-                if cur.prev.data_source is None:
-                    cur.prev.set_ds(manager.get_data_source(path.val))
+                if cur.prev_ex.planned_job is None:
+                    cur.prev_ex.planned_job = path.val
                 # recursively add transfer blocks down the branch
                 self._insert_transfer_block(x, p)
             cur.prereqs.clear()
@@ -264,6 +274,7 @@ class RootExecutable(Executable):
             path = self._get_lowest_cost_path(all_path)
             self._insert_transfer_block(self, path)
             self.pre_process()
+        return path
 
     def process(self):
         """
@@ -285,8 +296,9 @@ class ScheduleExecutable(Executable):
     only make local optimal decision
     """
 
-    def __init__(self, prev):
+    def __init__(self, prev, prev_ex):
         self.prev = prev
+        self.prev_ex = prev_ex
         self.prereqs = []
         self.rs_required = False
 
@@ -358,49 +370,51 @@ class ScheduleExecutable(Executable):
             plan1 = self.prereqs[0].plan()
             plan2 = self.prereqs[1].plan()
 
-            estimate_card = self.estimate_join_card(self.prereqs[0].df, self.prereqs[1].df)
+            estimate_card = self.estimate_join_card(self.prereqs[0], self.prereqs[1])
+            self.prev_ex.estimated_row = estimate_card
+            # todo: change width
+            self.prev_ex.estimated_width = len(self.prev.columns)*4
             all_plans = []
             for cost1, path1 in plan1:
                 for cost2, path2 in plan2:
                     # todo: remove redundant expressions
                     if path1.val == path2.val:
+                        # the two branches are from the same ds, thus no extra transfer is required
                         job_name = path1.val
                         new_path = Node(job_name, [path1, path2])
                         new_cost = cost1 + cost2
                         all_plans.append((new_cost, new_path))
                     else:
                         # path separate as there are two possible destinations
+                        possible_path = (path1.val, path2.val)
                         new_path = Node(path1.val, [path1, path2])
-                        new_cost = cost1 + cost2 + self.prior_join_cost(trans.sources(), (path1.val, path2.val),
-                                                                        path1.val, estimate_card)
+                        # todo: write it in a better way
+                        new_cost = cost1 + cost2 + self.prior_join_cost(self.prereqs[1], path1.val, path2.val, estimate_card)
                         all_plans.append((new_cost, new_path))
 
                         new_path = Node(path2.val, [path1, path2])
-                        new_cost = cost1 + cost2 + self.prior_join_cost(trans.sources(), (path1.val, path2.val),
-                                                                        path2.val, estimate_card)
+                        new_cost = cost1 + cost2 + self.prior_join_cost(self.prereqs[0], path2.val, path1.val, estimate_card)
                         all_plans.append((new_cost, new_path))
         else:
             all_plans = [[0, None]]
         return all_plans
 
-    def prior_join_cost(self, transfer_tables, cur_jobs, dest, joined_card):
+    def prior_join_cost(self, other_table, my_dest, other_dest,  joined_card):
         """
-
-        @param transfer_tables:
-        @param dest: location where the join take place
-        @return: cost the transfer data to perform the join and the result size if transferring back is required
+        compute the transferring cost if the other table does not have the same data source destination
+        @param other_table: the other table in the join
+        @param my_dest: current planned destination
+        @param other_dest: the other table's planned destination
+        @param joined_card: joined cardinality
+        @return:
         """
-        # collect metas for all tables needs to be transferred and calculate the cost to transfer them
-        metas = []
-        for table, job in zip(transfer_tables, cur_jobs):
-            if job != dest:
-                metas.append(get_meta(table))
-
-        cost_before = 0
-        for meta in metas:
+        if my_dest != other_dest:
+            meta = MetaInfo(other_table.df.columns, other_table.estimated_width, other_table.estimated_row)
             cost_before = meta.nrows*meta.ncols
+        else:
+            cost_before = 0
 
-        joined_card = joined_card if self.rs_required and dest != LOCAL_DS else 0
+        joined_card = joined_card if self.rs_required and my_dest != LOCAL_DS else 0
 
         return cost_before + joined_card
 
@@ -410,28 +424,31 @@ class ScheduleExecutable(Executable):
         @param count_result: whether the result set will be transfered
         @return:
         """
-        meta1 = get_meta(tbl1)
-        meta2 = get_meta(tbl2)
+        meta1 = MetaInfo(tbl1.df.columns, tbl1.estimated_row, tbl1.estimated_width)
+        meta2 = MetaInfo(tbl2.df.columns, tbl2.estimated_row, tbl2.estimated_width)
 
         trans = self.prev.transform
 
         from aidac.dataframe.transforms import SQLJoinTransform
 
         assert isinstance(trans, SQLJoinTransform)
-        join1_cols, join2_cols = trans.join_cols
-        hist1 = get_hist(tbl1, join1_cols)
-        hist2 = get_hist(tbl2, join2_cols)
-
-        rs_card = estimate_join_card(meta1.nrows, meta2.nrows, hist1.null_frac, hist2.null_frac, hist1.n_distinct, hist2.n_distinct)
+        # join1_cols, join2_cols = trans.join_cols
+        # hist1 = get_hist(tbl1.df, join1_cols)
+        # hist2 = get_hist(tbl2.df, join2_cols)
+        # todo: use new estimation
+        rs_card = estimate_join_card(meta1.nrows, meta2.nrows, 0, 0, meta1.nrows, meta2.nrows)
         return rs_card
 
+    # remove redundant transfer blocks if the dest and the origin are the same
     def pre_process(self):
         new_prereqs = []
+        should_remove = []
         for x in self.prereqs:
-            child = x.removable()
-            if child:
-                self.prereqs.remove(x)
-                new_prereqs.append(child)
+            can_remove, child = x.removable()
+            if can_remove:
+                should_remove.append(x)
+                new_prereqs.extend(child)
+        self.prereqs = [x for x in self.prereqs if x not in should_remove]
         self.prereqs.extend(new_prereqs)
 
     def process(self):

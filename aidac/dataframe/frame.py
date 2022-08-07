@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+import datetime
+import re
 from abc import abstractmethod
 import collections
 
@@ -37,10 +40,12 @@ def local_frame_wrapper(func):
 
     return inner
 
-
 class DataFrame:
+    tid = 1
     def __init__(self, data=None, table_name=None, transform=None, ds=None):
-        self.__tid__ = 't_' + uuid.uuid4().hex
+        DataFrame.tid += 1
+        tid_str = str(transform) + str(DataFrame.tid)
+        self.__tid__ = re.sub(r'\W+', '_', tid_str)
         self.source_table = table_name
         self._transform_ = transform
         self._columns_ = None
@@ -155,6 +160,10 @@ class DataFrame:
 
     @property
     def data_source(self):
+        if self._ds_:
+            return self._ds_
+        if self.data is not None:
+            self._ds_ = local_ds
         return self._ds_
 
     def __repr__(self) -> str:
@@ -225,6 +234,11 @@ class DataFrame:
     def aggregate(self, projcols, groupcols=None):
         transform = SQLAggregateTransform(self, projcols, groupcols)
         return DataFrame(ds=self.data_source, transform=transform)
+
+    @local_frame_wrapper
+    def agg(self, func, collist = []):
+        trans = SQLAGG_Transform(self, func, collist)
+        return DataFrame(self.data_source, transform=trans)
 
     @local_frame_wrapper
     def head(self, n=5):

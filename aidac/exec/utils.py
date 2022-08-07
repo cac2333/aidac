@@ -26,3 +26,16 @@ class Node:
     def add_child(self, child: Node, index=0):
         self.children[index] = child
 
+    def __str__(self):
+        l_child = str(self.children[0]) if self.children[0] else 'None'
+        r_child = str(self.children[1]) if self.children[1] else 'None'
+
+        def formatter(x):
+            return '\t' + x
+
+        l_child_lines = map(formatter, l_child.splitlines())
+        r_child_lines = map(formatter, r_child.splitlines())
+        l_child_lines = '\n'.join(l_child_lines)
+        r_child_lines = '\n'.join(r_child_lines)
+        s = f'{self.val}:\n{l_child_lines}\n{r_child_lines}'
+        return s
