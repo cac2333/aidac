@@ -930,13 +930,18 @@ class SQLAGG_Transform(SQLTransform):
 
         self._table_name_ = None
         self.func = func
+        self._is_dict_ = isinstance(collist, dict)
         self.collist = collist if len(collist) != 0 else self._source_.columns
 
     @property
     def columns(self):
+        # if isinstance(self.collist, dict):
+        #     pass
         if not self._columns_:
             self._gen_column(self._source_)
         return self._columns_
+
+
     @property
     def table_name(self):
         if not self._table_name_:
@@ -950,8 +955,19 @@ class SQLAGG_Transform(SQLTransform):
 
             colcount = 0
 
+            def _get_new_col(c, operation):
+                nonlocal colcount
+                colcount += 1
+                sc1 = c
+                pc1 = operation + "_" + c
+                srccol = sc1
+                projcol = pc1 if (isinstance(pc1, str)) else (
+                    sc1.columnExprAlias if (hasattr(sc1, 'columnExprAlias')) else 'col_'.format(colcount))
+                coltransform = None
+                return srccol, projcol, coltransform
+
             def _get_proj_col_info(c: dict | str):
-                print(f"the input c's looking: {c}")
+                # print(f"the input c's looking: {c}")
 
                 nonlocal colcount
                 colcount += 1
@@ -976,24 +992,54 @@ class SQLAGG_Transform(SQLTransform):
             src_cols = source.columns
 
             columns = collections.OrderedDict()
-            for col in self.collist:
-                srccol, projcoln, coltransform = _get_proj_col_info(col)
+            # print(isinstance(self.collist, dict))
+            if self._is_dict_:
+                for col in self.collist:
+                    operations = [self.collist[col]] if isinstance(self.collist[col], str) else self.collist[col]
 
-                sdbtables = []
-                srccols = []
-                scol = src_cols.get(srccol)
-                print(f"scol is {scol}")
-                if not scol:
-                    raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
-                else:
-                    srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
-                    sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
+                    for operation in operations:
+                        srccol, projcoln, coltransform = _get_new_col(col, operation)
 
-                column = Column(projcoln, scol.dtype)
-                column.srccol = srccols
-                column.tablename = sdbtables
-                column.transform = coltransform
-                columns[projcoln] = column
+
+
+                        sdbtables = []
+                        srccols = []
+                        scol = src_cols.get(srccol)
+                        # print(f"scol is {scol}")
+                        if not scol:
+                            raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
+                        else:
+                            srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
+                            sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
+
+                        column = Column(projcoln, scol.dtype)
+                        column.srccol = srccols
+                        column.tablename = sdbtables
+                        column.transform = coltransform
+                        columns[projcoln] = column
+
+
+            else:
+                print("fsdfdsfdsfsd")
+                for col in self.collist:
+                    srccol, projcoln, coltransform = _get_proj_col_info(col)
+
+                    sdbtables = []
+                    srccols = []
+                    scol = src_cols.get(srccol)
+                    # print(f"scol is {scol}")
+                    if not scol:
+                        raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
+                    else:
+                        srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
+                        sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
+
+                    column = Column(projcoln, scol.dtype)
+                    column.srccol = srccols
+                    column.tablename = sdbtables
+                    column.transform = coltransform
+                    columns[projcoln] = column
+
             self._columns_ = columns
 
     @property
@@ -1013,11 +1059,20 @@ class SQLAGG_Transform(SQLTransform):
         projcoltxt = None
 
         # affected_cols = self._source_.
-        for c in self.columns:
+        if not self._is_dict_:
+            for c in self.columns:
 
-            col = self.columns[c]
-            projcoltxt = (( projcoltxt + ", ") if (projcoltxt) else '') + (( self.func +'('+col.transform.genSQL + ')' if (col.transform)
-                else self.func +'('+col.srccol[0] + ')') + " AS " + col.name)
+                col = self.columns[c]
+                projcoltxt = (( projcoltxt + ", ") if (projcoltxt) else '') + (( self.func +'('+ col.transform.genSQL + ')' if (col.transform)
+                    else self.func +'('+col.srccol[0] + ')') + " AS " + col.name)
+        else:
+            for c in self.columns:
+                col = self.columns[c]
+                operations = [self.collist[col.srccol[0]]] if isinstance(self.collist[col.srccol[0]], str) else self.collist[col.srccol[0]]
+                for func in operations:
+                    if col.name == func + '_' + col.srccol[0]:
+                        projcoltxt = ((projcoltxt + ", ") if (projcoltxt) else '') + ((func + '(' + col.transform.genSQL + ')' if (col.transform)
+                        else func + '('+col.srccol[0] + ')') + " AS " + col.name)
 
         if has_groupby:
 

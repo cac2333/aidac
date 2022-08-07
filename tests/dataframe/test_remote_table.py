@@ -183,12 +183,20 @@ class MyTestCase(unittest.TestCase):
                               "LSE END AS iid FROM (SELECT * FROM midwife) midwife")
 
     def test_group_agg(self):
-        gag = self.midwife_.groupby({"iid":"new_iid"})
-        gag = gag.agg("count")
+        gag = self.midwife_.groupby("iid").agg(func="count")
         # p = gag.columns
 
         sql = gag.transform.genSQL
-        self.assertEqual(sql, "")
+        self.assertEqual(sql, "SELECT count(prac_id) AS count_prac_id, count(email) AS count_email,"
+                              " count(name) AS count_name, count(phone) AS count_phone, count(iid) "
+                              "AS count_iid FROM (SELECT * FROM midwife)midwife GROUP BY iid ORDER "
+                              "BY iid")
+        #
+        gag2 = self.midwife_.groupby("iid").agg(collist={"prac_id":["count", "max"],"email":"count", "iid":["count", "avg"]})
+        sql2 = gag2.transform.genSQL
+        self.assertEqual(sql2,"SELECT count(prac_id) AS count_prac_id, max(prac_id) AS max_prac_id,"
+                              " count(email) AS count_email, count(iid) AS count_iid, avg(iid) AS a"
+                              "vg_iid FROM (SELECT * FROM midwife)midwife GROUP BY iid ORDER BY iid")
 
 if __name__ == '__main__':
     unittest.main()

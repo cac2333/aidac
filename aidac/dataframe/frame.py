@@ -40,8 +40,10 @@ def local_frame_wrapper(func):
 
     return inner
 
+
 class DataFrame:
     tid = 1
+
     def __init__(self, data=None, table_name=None, transform=None, ds=None):
         DataFrame.tid += 1
         tid_str = str(transform) + str(DataFrame.tid)
@@ -131,7 +133,6 @@ class DataFrame:
         except Exception:
             return self.genSQL
 
-
     def add_source(self, ds):
         self._stubs_.append(ds)
 
@@ -216,7 +217,7 @@ class DataFrame:
         return DataFrame(ds=self.data_source, transform=transform)
 
     @local_frame_wrapper
-    def sort_values(self, orderlist: Union[List[str], str], ascending = True):
+    def sort_values(self, orderlist: Union[List[str], str], ascending=True):
 
         if isinstance(orderlist, str):
             keys = [orderlist]
@@ -244,9 +245,11 @@ class DataFrame:
         return DataFrame(ds=self.data_source, transform=transform)
 
     @local_frame_wrapper
-    def agg(self, func, collist = []):
+    def agg(self, func = None, collist: Union[None, List[str], Dict] = None):
+        if not collist:
+            collist = []
 
-        trans = SQLAGG_Transform(self, func, collist)
+        trans = SQLAGG_Transform(self, func=func, collist=collist)
         return DataFrame(self.data_source, transform=trans)
 
     @local_frame_wrapper
@@ -259,14 +262,13 @@ class DataFrame:
         transform = SQLTailTransform(self, n)
         return DataFrame(ds=self.data_source, transform=transform)
 
-
     @local_frame_wrapper
     def rename(self, columns: Dict):
         transform = SQLRenameTransform(self, columns)
         return DataFrame(ds=self.data_source, transform=transform)
 
     @local_frame_wrapper
-    def groupby(self, by: Union[List[str], str], sort=True, axis = 0):
+    def groupby(self, by: Union[List[str], str], sort=True, axis=0):
         if axis == 1:
             raise ValueError("axis = 1 (group by columns) is not currently suppported")
         if isinstance(by, str):
