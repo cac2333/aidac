@@ -124,6 +124,14 @@ class DataFrame:
         else:
             return 'SELECT * FROM ' + self.table_name
 
+    @property
+    def genSQL_compat(self):
+        try:
+            return self.transform.genSQL_compat
+        except Exception:
+            return self.genSQL
+
+
     def add_source(self, ds):
         self._stubs_.append(ds)
 
@@ -208,7 +216,7 @@ class DataFrame:
         return DataFrame(ds=self.data_source, transform=transform)
 
     @local_frame_wrapper
-    def order(self, orderlist: Union[List[str], str]):
+    def order(self, orderlist: Union[List[str], str], ascending = True):
 
         if isinstance(orderlist, str):
             keys = [orderlist]
@@ -217,7 +225,7 @@ class DataFrame:
                 raise ValueError("orderlist cannot be None!")
             keys = orderlist
 
-        transform = SQLOrderTransform(self, keys)
+        transform = SQLOrderTransform(self, keys, ascending)
         return DataFrame(ds=self.data_source, transform=transform)
 
     @local_frame_wrapper
@@ -237,6 +245,7 @@ class DataFrame:
 
     @local_frame_wrapper
     def agg(self, func, collist = []):
+
         trans = SQLAGG_Transform(self, func, collist)
         return DataFrame(self.data_source, transform=trans)
 

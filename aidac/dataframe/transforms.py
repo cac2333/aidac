@@ -447,11 +447,11 @@ class SQLRenameTransform(SQLTransform):
 class SQLOrderTransform(SQLTransform):
 
     # order does not reformat the columns
-    def __init__(self, source, orderlist):
+    def __init__(self, source, orderlist, ascending):
         super().__init__(source)
 
         self._order_ = orderlist
-
+        self._ascending_ = ascending
     def _gen_column(self, source):
         pass
 
@@ -477,20 +477,24 @@ class SQLOrderTransform(SQLTransform):
 
         key_res = ''
         sort_order = ''
-        print(ordered_col)
-        for key_ in range(len(ordered_col)):
-            key = ordered_col[key_]
-            if key.endswith("#asc"):
-                key_res = key[:-4]
-                sort_order = 'asc'
-            elif key.endswith("#desc"):
-                key_res = key[:-5]
-                sort_order = 'desc'
-            else:
-                key_res = key
-                sort_order = 'asc'
-            sql_text += key_res + ' ' + sort_order + ' '
+        # print(ordered_col)
+        # for key_ in range(len(ordered_col)):
+        #     key = ordered_col[key_]
+        #     if key.endswith("#asc"):
+        #         key_res = key[:-4]
+        #         sort_order = 'asc'
+        #     elif key.endswith("#desc"):
+        #         key_res = key[:-5]
+        #         sort_order = 'desc'
+        #     else:
+        #         key_res = key
+        #         sort_order = 'asc'
+        #     sql_text += key_res + ' ' + sort_order + ' '
+        for key_ in ordered_col:
+            sql_text = sql_text + key_ + ' ' + (('asc') if self._ascending_ else 'desc') + ', '
+        sql_text = sql_text[:-2]
         return self._source_.genSQL + ' ' + sql_text
+
 
 
 class SQLHeadTransform(SQLTransform):
@@ -552,55 +556,63 @@ class SQLGroupByTransform(SQLTransform):
         self.sort = sort
 
     def _gen_column(self, source):
+
+
         if not self._columns_:
 
-            # colcount = 0
-            #
-            # def _get_proj_col_info(c: dict | str):
-            #     # print(f"the input c's looking: {c}")
-            #
-            #     nonlocal colcount
-            #     colcount += 1
-            #     if isinstance(c, dict):  # check if the projected column is given an alias name
-            #         sc1 = list(c.keys())[0]  # get the source column name / function
-            #         pc1 = c.get(sc1)  # and the alias name for projection.
-            #     else:
-            #         sc1 = pc1 = c  # otherwise projected column name / function is the same as the source column.
-            #     # we only consider one possible source column as the renaming is one-one
-            #
-            #     # todo: may need to extend this to use F class
-            #     srccol = sc1
-            #     # projected column alias, use the one given, else take it from the expression if it has one, or else generate one.
-            #     projcol = pc1 if (isinstance(pc1, str)) else (
-            #         sc1.columnExprAlias if (hasattr(sc1, 'columnExprAlias')) else 'col_'.format(colcount))
-            #     # coltransform = sc1 if (isinstance(sc1, F)) else None
-            #     # todo: extend this to use F class
-            #     coltransform = None
-            #     return srccol, projcol, coltransform
-            #
-            # src_cols = source.columns
-            #
-            # columns = collections.OrderedDict()
+            colcount = 0
+
+            def _get_proj_col_info(c: dict | str):
+                print(f"the input c's looking: {c}")
+
+                nonlocal colcount
+                colcount += 1
+                if isinstance(c, dict):  # check if the projected column is given an alias name
+                    sc1 = list(c.keys())[0]  # get the source column name / function
+                    pc1 = c.get(sc1)  # and the alias name for projection.
+                else:
+                    sc1 = pc1 = c  # otherwise projected column name / function is the same as the source column.
+                # we only consider one possible source column as the renaming is one-one
+
+                # todo: may need to extend this to use F class
+                srccol = sc1
+                # projected column alias, use the one given, else take it from the expression if it has one, or else generate one.
+                projcol = pc1 if (isinstance(pc1, str)) else (
+                    sc1.columnExprAlias if (hasattr(sc1, 'columnExprAlias')) else 'col_'.format(colcount))
+                # coltransform = sc1 if (isinstance(sc1, F)) else None
+                # todo: extend this to use F class
+                coltransform = None
+                return srccol, projcol, coltransform
+
+            src_cols = source.columns
+
+            print("src cols:= ",src_cols)
+
+            columns = collections.OrderedDict()
+
+
+
+
+            for col in src_cols:
             # for col in self._groupcols_:
-            #     srccol, projcoln, coltransform = _get_proj_col_info(col)
-            #
-            #     sdbtables = []
-            #     srccols = []
-            #     scol = src_cols.get(srccol)
-            #     # print(f"scol is {scol}")
-            #     if not scol:
-            #         raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
-            #     else:
-            #         srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
-            #         sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
-            #
-            #     column = Column(projcoln, scol.dtype)
-            #     column.srccol = srccols
-            #     column.tablename = sdbtables
-            #     column.transform = coltransform
-            #     columns[projcoln] = column
-            # self._columns_ = columns
-            self._columns_ = self._source_.columns
+                srccol, projcoln, coltransform = _get_proj_col_info(col)
+
+                sdbtables = []
+                srccols = []
+                scol = src_cols.get(srccol)
+                print(f"scol is {scol}")
+                if not scol:
+                    raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
+                else:
+                    srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
+                    sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
+
+                column = Column(projcoln, scol.dtype)
+                column.srccol = srccols
+                column.tablename = sdbtables
+                column.transform = coltransform
+                columns[projcoln] = column
+            self._columns_ = columns
 
     def execute_source(self):
         pass
@@ -609,16 +621,36 @@ class SQLGroupByTransform(SQLTransform):
     def columns(self):
         if not self._columns_:
             self._gen_column(self._source_)
+            # self._group_columns_
+            # self._columns_ = self._source_.columns
+            print("current self._columns_ is :=",self._columns_)
         return self._columns_
+
+    @property
+    def genSQL_compat(self):
+        groupcoltxt = None
+        if self._groupcols_:
+            for g in self._groupcols_:
+                groupcoltxt = ((groupcoltxt + ', ') if (groupcoltxt) else '') + g
+
+        sort_coltxt = None
+        if self.sort:
+            for col in self._groupcols_:
+                sort_coltxt = ((sort_coltxt + ", ") if (sort_coltxt) else "") + col
+
+        sql_text = '('+ self._source_.genSQL +')' +self._source_.table_name+ ((' GROUP BY ' + groupcoltxt) if (groupcoltxt) else '' ) + ((" ORDER BY " + sort_coltxt) if self.sort else '')
+
+        return sql_text
 
     @property
     def genSQL(self):
         projcoltxt = None
         for c in self.columns:  # Prepare the list of columns going into the select statement.
-            col = self.columns[c]
+            if c in self._groupcols_:
+                col = self.columns[c]
 
-            projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + ((col.transform.genSQL if (
-                col.transform) else col.srccol[0]) + ' AS ' + col.name)
+                projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + ((col.transform.genSQL if (
+                    col.transform) else col.srccol[0]) + ' AS ' + col.name)
 
         groupcoltxt = None
         if self._groupcols_:
@@ -630,11 +662,10 @@ class SQLGroupByTransform(SQLTransform):
             for col in self._groupcols_:
                 sort_coltxt = ((sort_coltxt + ", ") if (sort_coltxt) else "") + col
 
-        # sqlText = ('SELECT ' + projcoltxt +' FROM '
-        #            + '(' + self._source_.genSQL + ') ' + self._source_.table_name  # Source table transform SQL.
-        #            + ((' GROUP BY ' + groupcoltxt) if (groupcoltxt) else '' ) + ((" ORDER BY " + sort_coltxt) if self.sort else '')
-        #            )
-        sqlText = ' FROM (' + self._source_.genSQL + ') ' + self._source_.table_name + ((' GROUP BY ' + groupcoltxt) if (groupcoltxt) else '' ) + ((" ORDER BY " + sort_coltxt) if self.sort else '')
+        sqlText = ('SELECT ' + projcoltxt +' FROM '
+                   + '(' + self._source_.genSQL + ') ' + self._source_.table_name  # Source table transform SQL.
+                   + ((' GROUP BY ' + groupcoltxt) if (groupcoltxt) else '' ) + ((" ORDER BY " + sort_coltxt) if self.sort else '')
+                   )
         return sqlText
 
 
@@ -896,6 +927,8 @@ class SQLAGG_Transform(SQLTransform):
 
     def __init__(self, source, func, collist):
         super().__init__(source)
+
+        self._table_name_ = None
         self.func = func
         self.collist = collist if len(collist) != 0 else self._source_.columns
 
@@ -904,81 +937,98 @@ class SQLAGG_Transform(SQLTransform):
         if not self._columns_:
             self._gen_column(self._source_)
         return self._columns_
+    @property
+    def table_name(self):
+        if not self._table_name_:
+            self._table_name_ = self._source_.table_name
+        return self._table_name_
 
     def _gen_column(self, source):
 
 
         if not self._columns_:
 
-            # colcount = 0
-            #
-            # def _get_proj_col_info(c: dict | str):
-            #     # print(f"the input c's looking: {c}")
-            #
-            #     nonlocal colcount
-            #     colcount += 1
-            #     if isinstance(c, dict):  # check if the projected column is given an alias name
-            #         sc1 = list(c.keys())[0]  # get the source column name / function
-            #         pc1 = c.get(sc1)  # and the alias name for projection.
-            #     else:
-            #         sc1 = c  # otherwise projected column name / function is the same as the source column.
-            #     # we only consider one possible source column as the renaming is one-one
-            #         pc1 = str(self.func) + "_" + c
-            #
-            #     # todo: may need to extend this to use F class
-            #     srccol = sc1
-            #     # projected column alias, use the one given, else take it from the expression if it has one, or else generate one.
-            #     projcol = pc1 if (isinstance(pc1, str)) else (
-            #         sc1.columnExprAlias if (hasattr(sc1, 'columnExprAlias')) else 'col_'.format(colcount))
-            #     # coltransform = sc1 if (isinstance(sc1, F)) else None
-            #     # todo: extend this to use F class
-            #     coltransform = None
-            #     return srccol, projcol, coltransform
-            #
-            # src_cols = source.columns
-            #
-            # columns = collections.OrderedDict()
-            # for col in self.collist:
-            #     srccol, projcoln, coltransform = _get_proj_col_info(col)
-            #
-            #     sdbtables = []
-            #     srccols = []
-            #     scol = src_cols.get(srccol)
-            #     # print(f"scol is {scol}")
-            #     if not scol:
-            #         raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
-            #     else:
-            #         srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
-            #         sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
-            #
-            #     column = Column(projcoln, scol.dtype)
-            #     column.srccol = srccols
-            #     column.tablename = sdbtables
-            #     column.transform = coltransform
-            #     columns[projcoln] = column
-            # self._columns_ = columns
-            self._columns_ = self._source_.columns
+            colcount = 0
+
+            def _get_proj_col_info(c: dict | str):
+                print(f"the input c's looking: {c}")
+
+                nonlocal colcount
+                colcount += 1
+                if isinstance(c, dict):  # check if the projected column is given an alias name
+                    sc1 = list(c.keys())[0]  # get the source column name / function
+                    pc1 = c.get(sc1)  # and the alias name for projection.
+                else:
+                    sc1 = c  # otherwise projected column name / function is the same as the source column.
+                # we only consider one possible source column as the renaming is one-one
+                    pc1 = str(self.func) + "_" + c
+
+                # todo: may need to extend this to use F class
+                srccol = sc1
+                # projected column alias, use the one given, else take it from the expression if it has one, or else generate one.
+                projcol = pc1 if (isinstance(pc1, str)) else (
+                    sc1.columnExprAlias if (hasattr(sc1, 'columnExprAlias')) else 'col_'.format(colcount))
+                # coltransform = sc1 if (isinstance(sc1, F)) else None
+                # todo: extend this to use F class
+                coltransform = None
+                return srccol, projcol, coltransform
+
+            src_cols = source.columns
+
+            columns = collections.OrderedDict()
+            for col in self.collist:
+                srccol, projcoln, coltransform = _get_proj_col_info(col)
+
+                sdbtables = []
+                srccols = []
+                scol = src_cols.get(srccol)
+                print(f"scol is {scol}")
+                if not scol:
+                    raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
+                else:
+                    srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
+                    sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
+
+                column = Column(projcoln, scol.dtype)
+                column.srccol = srccols
+                column.tablename = sdbtables
+                column.transform = coltransform
+                columns[projcoln] = column
+            self._columns_ = columns
 
     @property
     def genSQL(self):
 
+        has_groupby = False
+
+        if isinstance(self._source_.transform, SQLGroupByTransform):
+            has_groupby = True
+
+        print("check if has groupby previously",has_groupby)
+
+        tb_name = self._source_.table_name
         targetcol = None
         if len(self.collist) == 0:
             targetcol = "(*)"
         projcoltxt = None
+
+        # affected_cols = self._source_.
         for c in self.columns:
+
             col = self.columns[c]
-            if c in self.collist:
-                col_sql = self.func + f'({col.srccol[0]})'
-            else:
-                col_sql = col.srccol[0]
-            projcoltxt = (( projcoltxt + ", ") if (projcoltxt) else '') +\
-                         (( self.func +'('+col.transform.genSQL + ')' if (col.transform)
-                else col_sql) + " AS " + col.name)
-        assert(isinstance(self._source_.transform, SQLGroupByTransform))
-        sqlText = ("SELECT " + projcoltxt + self._source_.genSQL )
+            projcoltxt = (( projcoltxt + ", ") if (projcoltxt) else '') + (( self.func +'('+col.transform.genSQL + ')' if (col.transform)
+                else self.func +'('+col.srccol[0] + ')') + " AS " + col.name)
+
+        if has_groupby:
+
+            sqlText = ("SELECT " + projcoltxt + " FROM "
+                        + self._source_.genSQL_compat )
+        else:
+            sqlText = ("SELECT " + projcoltxt + " FROM "
+                       + "(" + self._source_.genSQL+ ") " + self._source_.table_name)
 
         return sqlText
+
 
 class SQLDropNA(SQLTransform):
     def __init__(self, source, cols):

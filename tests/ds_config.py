@@ -1,7 +1,7 @@
 PG_CONFIG = {
     'host': 'localhost',
-    'dbname': 'myDB',
+    'dbname': 'aida',
     'user': 'postgres',
-    'passwd': 'postgres',
+    'passwd': '1758',
     'port': '5432'
 }

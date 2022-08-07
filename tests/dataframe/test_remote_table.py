@@ -60,7 +60,7 @@ class MyTestCase(unittest.TestCase):
         order_ = self.coup_.order("sid")
         self.assertTrue(isinstance(order_.transform, SQLOrderTransform))
         sql = order_.transform.genSQL
-        self.assertEqual(sql, 'SELECT * FROM couple ORDER BY sid asc ')
+        self.assertEqual(sql, 'SELECT * FROM couple ORDER BY sid asc')
 
     # def test_schdule1(self):
     #     proj = self.station['sid']
@@ -77,7 +77,7 @@ class MyTestCase(unittest.TestCase):
         self.assertTrue(isinstance(gb.transform, SQLGroupByTransform))
         sql = gb.transform.genSQL
         self.assertEqual(sql,
-                         "SELECT iid AS iid, email AS email FROM (SELECT * FROM midwife) midwife GROUP BY iid, email ORDER BY iid, email")
+                         "SELECT email AS email, iid AS iid FROM (SELECT * FROM midwife) midwife GROUP BY iid, email ORDER BY iid, email")
 
     def test_fillna(self):
         fillna = self.coup_.fillna()
@@ -182,6 +182,13 @@ class MyTestCase(unittest.TestCase):
                               "TRUE ELSE FALSE END AS phone, CASE WHEN iid < 6 THEN TRUE ELSE FA"
                               "LSE END AS iid FROM (SELECT * FROM midwife) midwife")
 
+    def test_group_agg(self):
+        gag = self.midwife_.groupby({"iid":"new_iid"})
+        gag = gag.agg("count")
+        # p = gag.columns
+
+        sql = gag.transform.genSQL
+        self.assertEqual(sql, "")
 
 if __name__ == '__main__':
     unittest.main()
