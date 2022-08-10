@@ -11,11 +11,11 @@ _PATH = 'datasets/'
 class Database:
     def __init__(self, host, dbname, schema, port, user, pwd):
         self.con = psycopg.connect(
-            f'''host={host} 
-            dbname={dbname} 
-            user={user} 
-            port={port} 
-            password={pwd}'''
+            '''host={} 
+            dbname={} 
+            user={} 
+            port={} 
+            password={}'''.format(host, dbname, user, port, pwd)
         )
         self.schema = schema
 
@@ -77,7 +77,7 @@ def my_query_02():
 def q_01_v1():
     """291"""
     l = pd.read_remote_data('p1', 'lineitem')
-    l = l.query(f'l_shipdate <= \'1998-9-2\'')
+    l = l.query('l_shipdate <= \'1998-9-2\'')
     l.sort_values(['l_returnflag', 'l_linestatus'])
     return l
 
@@ -105,14 +105,14 @@ def q_03_v1():
     c = my_db.get_table('customer')
 
     l = my_db.get_table('lineitem')
-    c = c.query('c_mktsegment == \'BUILDING\'')
+    c = c.query('c_mktsegment == \'BUILDING\'')[['c_custkey', 'c_mktsegment']]
     o = o[['o_orderdate', 'o_shippriority', 'o_orderkey', 'o_custkey']]
     l = l[l['l_shipdate'] > datetime.date(1995, 3, 15)]
     # l['revenue'] = l['l_extendedprice'] * (1 - l['l_discount'])
     l = l[['l_orderkey', 'l_extendedprice']]
 
-    t = c.merge(o, left_on='c_custkey', right_on='o_custkey')
-    t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey')
+    t = c.merge(o, left_on='c_custkey', right_on='o_custkey', how='inner')
+    t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey', how='inner')
     t = t[['l_orderkey', 'l_extendedprice', 'o_orderdate', 'o_shippriority']]
     t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority')).agg('sum')
 
@@ -126,7 +126,7 @@ def measure_time(func, *args):
     print('Function {} takes time {}'.format(func, end-start))
 
 
-my_db = Database('localhost', 'sf01', 'sf01', 6000, 'sf01', 'sf01')
+my_db = Database('127.0.0.1', 'sf01', 'public', 5432, 'postgres', 'postgres')
 
 if __name__ == '__main__':
-    measure_time(q_03_v1)
+    measure_time(my_query_02)

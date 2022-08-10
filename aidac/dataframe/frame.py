@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import numbers
 import re
 from abc import abstractmethod
 import collections
@@ -78,6 +79,13 @@ class DataFrame:
 
     def __str__(self):
         return self.table_name
+
+    def __setitem__(self, key, value):
+        # todo: multiple column
+        new_col = next(iter(value.columns))
+        trans = SQLProjectionTransform(self, {key: value.new_col})
+        tb = DataFrame(transform=trans, ds=self.data_source)
+        return tb
 
     @local_frame_wrapper
     def __getitem__(self, key):
@@ -250,7 +258,7 @@ class DataFrame:
             collist = []
 
         trans = SQLAGG_Transform(self, func=func, collist=collist)
-        return DataFrame(self.data_source, transform=trans)
+        return DataFrame(ds=self.data_source, transform=trans)
 
     @local_frame_wrapper
     def head(self, n=5):
@@ -294,46 +302,63 @@ class DataFrame:
         return self._data_.to_json(path_or_buf, orient, date_format, double_precision, force_ascii, date_unit,
                                    default_handler, lines, compression, index, indent, storage_options)
 
+    def __add__(self, other):
+        # add a number to the dataframe
+        if isinstance(other, numbers.Number):
+            trans = SQLBinaryOperationTransform(self, '+', other, True)
+        elif isinstance(other, DataFrame):
+            trans = SQLBinaryOperationTransform(self, '+', other)
+        else:
+            raise TypeError('Addition with {} is not supported'.format(type(other)))
+        return DataFrame(ds=self.data_source, transform=trans)
+
+    def __mul__(self, other):
+        if isinstance(other, numbers.Number) or isinstance(other, DataFrame):
+            trans = SQLBinaryOperationTransform(self, '*', other)
+            return DataFrame(ds=self.data_source, transform=trans)
+        else:
+            raise TypeError('Multiplication with {} is not supported'.format(type(other)))
+
     @local_frame_wrapper
     def __eq__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "eq", other)
-            return DataFrame(self.data_source, transform=trans)
+            return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __ge__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "ge", other)
-            return DataFrame(self.data_source, transform=trans)
+            return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __gt__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "gt", other)
-            return DataFrame(self.data_source, transform=trans)
+            return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __ne__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "ne", other)
-            return DataFrame(self.data_source, transform=trans)
+            return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __lt__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "lt", other)
-            return DataFrame(self.data_source, transform=trans)
+            return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __le__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
             trans = SQLFilterTransform(self, "le", other)
-            return DataFrame(self.data_source, transform=trans)
+            return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     def to_string(self, buf=None, columns=None, col_space=None, header=True, index=True, na_rep='NaN', formatters=None,

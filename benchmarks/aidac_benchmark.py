@@ -66,13 +66,13 @@ def my_query_02():
     209+38"""
     o = read_file('orders')
     l = pd.read_remote_data('p1', 'lineitem')
-    l = l.query(f'l_shipdate < \'1998-9-2\'')
+    l = l.query('l_shipdate < \'1998-9-2\'')
     t = o.merge(l, left_on='o_orderkey', right_on='l_orderkey')[['l_orderkey', 'o_orderdate', 'o_shippriority']]
     return t
 
 def q_01_v1():
     l = pd.read_remote_data('p1', 'lineitem')
-    l = l.query(f'l_shipdate <= \'1998-9-2\'')
+    l = l.query('l_shipdate <= \'1998-9-2\'')
     l.sort_values(['l_returnflag', 'l_linestatus'])
     return l
 
@@ -80,7 +80,7 @@ def q_01_v2():
     """209+38"""
     o = read_file('orders')
     l = pd.read_remote_data('p1', 'lineitem')
-    l = l.query(f'l_shipdate < \'1998-9-2\'')
+    l = l.query('l_shipdate < \'1998-9-2\'')
     t = o.merge(l, left_on='o_orderkey', right_on='l_orderkey')[['l_orderkey', 'o_orderdate', 'o_shippriority']]
     return t
 
@@ -95,8 +95,8 @@ def q_03_v1():
     # l['revenue'] = l['l_extendedprice'] * (1 - l['l_discount'])
     l = l[['l_orderkey', 'l_extendedprice']]
 
-    t = c.merge(o, left_on='c_custkey', right_on='o_custkey')
-    t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey')
+    t = c.merge(o, left_on='c_custkey', right_on='o_custkey', how='inner')
+    t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey', how='inner')
     t = t[['l_orderkey', 'l_extendedprice', 'o_orderdate', 'o_shippriority']]
     t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority')).agg('sum', ['l_extendedprice'])
     # t.sort_values(['revenue', 'o_orderdate'], ascending=[False, True], inplace=True)
@@ -114,6 +114,6 @@ def measure_time(func, *args):
 
 
 if __name__ == '__main__':
-    connect('localhost', 'sf01', 'sf01', 6000, 'sf01', 'sf01')
-    measure_time(q_03_v1)
+    connect('127.0.0.1', 'sf01', 'sf01', 5432, 'postgres', 'postgres')
+    measure_time(my_query_01)
     # udf_func()

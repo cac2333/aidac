@@ -208,6 +208,57 @@ class SQLAggregateTransform(SQLTransform):
         return sql_text
 
 
+class SQLBinaryOperationTransform(SQLTransform):
+    def __init__(self, source, op, other, is_num=False):
+        super().__init__(source)
+        self.op = op
+        self._other_ = other
+        self._is_num_ = is_num
+
+    def _col_exp(self, col):
+        sc = self._source_.columns
+        if self._is_num_:
+            # single column operation
+            return '('+str(self._other_) + self.op + col.full_name()+')'
+        else:
+            # todo: add multi column operation
+            oc = self._other_.columns
+            ocol_name = next(iter(oc))
+            ocol = oc[ocol_name]
+            if ocol.column_expr:
+                other_text = ocol.column_expr
+            else:
+                other_text = ocol.full_name()
+            return '('+other_text + self.op + col.full_name()+')'
+
+    @property
+    def columns(self):
+        if not self._columns_:
+            self._columns_ = super().columns
+            for col_name in self._columns_:
+                # todo: update column name
+                col = self._columns_[col_name]
+                # need to assign table name before column expression
+                col.tablename = [self._source_.table_name]
+                col.column_expr = self._col_exp(col)
+        return self._columns_
+
+    @property
+    def genSQL(self, partial=False):
+        if partial:
+            return self._source_.genSQL
+        else:
+            projcoltxt = None
+            for col_name in self.columns:
+                col = self.columns[col_name]
+                projcoltxt = ((projcoltxt + ', ') if projcoltxt else '') + ((col.column_expr if (
+                    col.column_expr) else col.srccol[0]) + ' AS ' + col.name)
+
+            if hasattr(self._source_, 'transform') and isinstance(self._source_.transform, SQLBinaryOperationTransform):
+                return 'SELECT ' + projcoltxt + ' FROM (' + self._source_.genSQL(True) + ') ' + self._source_.table_name
+            else:
+                return 'SELECT ' + projcoltxt + ' FROM (' + self._source_.genSQL + ') ' + self._source_.table_name
+
 class SQLProjectionTransform(SQLTransform):
     def __init__(self, source, projcols):
         super().__init__(source)
@@ -229,11 +280,11 @@ class SQLProjectionTransform(SQLTransform):
                 # todo: may need to extend this to use F class
                 srccol = sc1
                 # projected column alias, use the one given, else take it from the expression if it has one, or else generate one.
-                projcol = pc1 if (isinstance(pc1, str)) else (
-                    sc1.columnExprAlias if (hasattr(sc1, 'columnExprAlias')) else 'col_'.format(colcount))
+                projcol = pc1 if (isinstance(pc1, str)) else sc1
                 # coltransform = sc1 if (isinstance(sc1, F)) else None
-                # todo: extend this to use F class
-                coltransform = None
+                # todo: what if the value to be assigned has more than 1 col here?
+
+                coltransform = pc1.column_expr if hasattr(pc1, 'column_expr') else None
                 return srccol, projcol, coltransform
 
             src_cols = source.columns
@@ -269,8 +320,8 @@ class SQLProjectionTransform(SQLTransform):
         projcoltxt = None
         for c in self.columns:  # Prepare the list of columns going into the select statement.
             col = self.columns[c];
-            projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + ((col.transform.columnExpr if (
-                col.transform) else col.srccol[0]) + ' AS ' + col.name);
+            projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + ((col.column_expr if (
+                col.column_expr) else col.srccol[0]) + ' AS ' + col.name);
 
         sql_text = ('SELECT ' + projcoltxt + ' FROM '
                     + '(' + self._source_.genSQL + ') ' + self._source_.table_name  # Source table transform SQL.
@@ -563,7 +614,7 @@ class SQLGroupByTransform(SQLTransform):
             colcount = 0
 
             def _get_proj_col_info(c: dict | str):
-                print(f"the input c's looking: {c}")
+                # print(f"the input c's looking: {c}")
 
                 nonlocal colcount
                 colcount += 1
@@ -600,7 +651,7 @@ class SQLGroupByTransform(SQLTransform):
                 sdbtables = []
                 srccols = []
                 scol = src_cols.get(srccol)
-                print(f"scol is {scol}")
+                # print(f"scol is {scol}")
                 if not scol:
                     raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
                 else:
@@ -688,7 +739,7 @@ class SQLFillNA(SQLTransform):
     @property
     def genSQL(self):
         # TODO : find a general solution to support filling all blanks/ filling particular columns
-        sqltext = f'SELECT '
+        sqltext = 'SELECT '
         # col_to_fill = self.columns if isinstance(self._col_to_fill, list) and len(self._col_to_fill) == 0
         # elif isinstance()
         if isinstance(self._col_to_fill, list) and len(self._col_to_fill) == 0:
@@ -1020,7 +1071,6 @@ class SQLAGG_Transform(SQLTransform):
 
 
             else:
-                print("fsdfdsfdsfsd")
                 for col in self.collist:
                     srccol, projcoln, coltransform = _get_proj_col_info(col)
 
@@ -1050,7 +1100,7 @@ class SQLAGG_Transform(SQLTransform):
         if isinstance(self._source_.transform, SQLGroupByTransform):
             has_groupby = True
 
-        print("check if has groupby previously",has_groupby)
+        # print("check if has groupby previously",has_groupby)
 
         tb_name = self._source_.table_name
         targetcol = None
@@ -1101,7 +1151,7 @@ class SQLDropNA(SQLTransform):
 
     @property
     def genSQL(self):
-        sql_text = f'DELETE FROM {self._source_.table_name} where '
+        sql_text = 'DELETE FROM {} where '.format(self._source_.table_name)
 
         target_col = [self._targetcols_] if isinstance(self._targetcols_, str) else self._targetcols_
 

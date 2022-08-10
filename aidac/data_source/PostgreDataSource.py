@@ -3,10 +3,11 @@ from __future__ import annotations
 import numpy as np
 import pandas
 
+from aidac.common.DataIterator import generator
 from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource
 from aidac.data_source.QueryLoader import QueryLoader
-import psycopg2
+import psycopg
 from psycopg2.extensions import register_adapter, AsIs
 
 from aidac.data_source.ResultSet import ResultSet
@@ -32,12 +33,12 @@ class PostgreDataSource(DataSource):
     def connect(self):
         self.port = 5432 if self.port is None else self.port
 
-        self.__conn = psycopg2.connect(
-            f'''host={self.host} 
-            port={self.port} 
-            dbname={self.dbname} 
-            user={self.username} 
-            password={self.password}'''
+        self.__conn = psycopg.connect(
+            """host={} 
+            port={} 
+            dbname={} 
+            user={} 
+            password={}""".format(self.host, self.port, self.dbname, self.username, self.password)
         )
         self.__cursor = self.__conn.cursor()
 
@@ -52,9 +53,9 @@ class PostgreDataSource(DataSource):
         start = time.time()
         column_name = ', '.join(list(cols.keys()))
         with self.__cursor.copy(ql.copy_data(table, column_name)) as copy:
-            for row in data:
+            for row in generator(data):
                 copy.write_row(row)
-        # print(start-time.time())
+        print('loading data time: '+str(start-time.time()))
 
     def table_columns(self, table: str):
         qry = ql.table_columns(table)

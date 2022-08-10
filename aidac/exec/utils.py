@@ -37,5 +37,5 @@ class Node:
         r_child_lines = map(formatter, r_child.splitlines())
         l_child_lines = '\n'.join(l_child_lines)
         r_child_lines = '\n'.join(r_child_lines)
-        s = f'{self.val}:\n{l_child_lines}\n{r_child_lines}'
+        s = self.val+':\n'+l_child_lines+'\n'+r_child_lines
         return s

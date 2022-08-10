@@ -6,4 +6,8 @@ class Column:
         self.schema = schema
         self.nullable = nullable
         self.srccol = srccol
-        self.transform = transform
+        self.column_expr = transform
+
+    def full_name(self):
+        # return self.tablename[0] + '.' +self.name
+        return self.name

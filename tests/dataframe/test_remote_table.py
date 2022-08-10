@@ -45,6 +45,18 @@ class MyTestCase(unittest.TestCase):
         expected = 'SELECT sid AS sid FROM ({})'.format(sql1)
         self.assertRegex(sql2, re.escape(expected))
 
+    def test_numerical_operation(self):
+        ad = self.midwife_['prac_id'] + 1
+        mul = self.midwife_['prac_id'] * ad
+        sql = mul.genSQL
+        self.assertEqual(sql,
+                    'SELECT ((1+prac_id)*prac_id) AS prac_id FROM (SELECT prac_id AS prac_id FROM'
+                    ' (SELECT * FROM midwife) midwife) SQLProjectionTransform9')
+
+    def test_set_item(self):
+        self.midwife_['new_id'] = self.midwife_['prac_id'] + 1
+        sql
+
     def test_remote_join(self):
         jn = self.users.merge(self.review, 'userid', 'inner')
         sql = jn.transform.genSQL

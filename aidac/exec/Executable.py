@@ -196,8 +196,8 @@ class TransferExecutable(Executable):
             start = time.time()
             dest_ds = manager.get_data_source(dest)
             dest_ds.create_table(src.table_name, scols)
-            dest_ds.import_table(src.table_name, scols, generator(src.data))
-            print(f'transfer takes time {time.time()-start}')
+            dest_ds.import_table(src.table_name, scols, src.data)
+            print('transfer takes time {}'.format(start-time.time()))
         # todo: decide if a local stub should be created
 
     def removable(self):
