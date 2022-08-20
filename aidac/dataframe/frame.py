@@ -294,6 +294,8 @@ class DataFrame:
         return self._data_.to_json(path_or_buf, orient, date_format, double_precision, force_ascii, date_unit,
                                    default_handler, lines, compression, index, indent, storage_options)
 
+    # def __str__(self):
+
     @local_frame_wrapper
     def __eq__(self, other):
         if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
@@ -363,6 +365,9 @@ class DataFrame:
     def read_orc(cls, path, columns=None, **kwargs):
         return DataFrame(pd.read_orc(columns, **kwargs))
 
+    def contains(self, condition, regex = True):
+        trans = SQLContainTransform(self, condition, regex)
+        return DataFrame(self.data_source, transform=trans)
 
 class RemoteTable(DataFrame):
     def __init__(self, source: DataSource = None, transform: Transform = None, table_name: str = None):

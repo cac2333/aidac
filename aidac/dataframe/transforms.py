@@ -917,6 +917,36 @@ class SQLQuery(SQLTransform):
 #     @property
 #     def genSQL(self):
 
+class SQLContainTransform(SQLTransform):
+    def __init__(self, source, condition, regex):
+        super().__init__(source)
+        self._condition_ = condition
+
+        self._regex_ = regex
+
+    @property
+    def columns(self):
+        # if isinstance(self.collist, dict):
+        #     pass
+        if not self._columns_:
+            self._columns_ = self._source_.columns
+        return self._columns_
+
+    @property
+    def genSQL(self):
+
+        prev_op = False
+        if isinstance(self._source_.transform, SQLProjectionTransform):
+            prev_op = True
+
+        sqltext = "SELECT * FROM " + self._source_.table_name + " WHERE "
+
+        if self._regex_:
+            sqltext += " LIKE " + "'" + self._condition_ + "'"
+
+
+
+
 class SQLApply(SQLTransform):
     def __init__(self, source, func, axis):
         super().__init__(source)

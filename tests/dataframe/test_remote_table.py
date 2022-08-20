@@ -95,6 +95,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(sql, 'SELECT DISTINCT couple_id, hcardid, sid FROM (SELECT * FROM couple) couple')
 
     def test_drop_na(self):
+
         dn = self.coup_.dropna()
         self.assertTrue(isinstance(dn.transform, SQLDropNA))
         sql = dn.transform.genSQL
@@ -182,6 +183,7 @@ class MyTestCase(unittest.TestCase):
                               "TRUE ELSE FALSE END AS phone, CASE WHEN iid < 6 THEN TRUE ELSE FA"
                               "LSE END AS iid FROM (SELECT * FROM midwife) midwife")
 
+
     def test_group_agg(self):
         gag = self.midwife_.groupby("iid").agg(func="count")
         # p = gag.columns
@@ -192,11 +194,26 @@ class MyTestCase(unittest.TestCase):
                               "AS count_iid FROM (SELECT * FROM midwife)midwife GROUP BY iid ORDER "
                               "BY iid")
         #
-        gag2 = self.midwife_.groupby("iid").agg(collist={"prac_id":["count", "max"],"email":"count", "iid":["count", "avg"]})
+        gag2 = self.midwife_.groupby("iid").agg(collist=
+                                                {"prac_id":["count", "max"],
+                                                 "email":"count",
+                                                 "iid":["count", "avg"]})
         sql2 = gag2.transform.genSQL
         self.assertEqual(sql2,"SELECT count(prac_id) AS count_prac_id, max(prac_id) AS max_prac_id,"
                               " count(email) AS count_email, count(iid) AS count_iid, avg(iid) AS a"
                               "vg_iid FROM (SELECT * FROM midwife)midwife GROUP BY iid ORDER BY iid")
+
+        gag2 = self.midwife_.groupby("iid").agg(collist=
+                                                {"prac_id": ["count", "max"],
+                                                 "email": "count",
+                                                 "iid": ["count", "avg"]})
+
+    def test_contains(self):
+
+        ct = self.midwife_[self.midwife_["email"].contains(".com")]
+        sql = ct.transform.genSQL
+
+        self.assertEqual(sql, "")
 
 if __name__ == '__main__':
     unittest.main()
