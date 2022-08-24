@@ -218,12 +218,19 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(sql, "")
 
     def test_materialize(self):
-        mt = self.info_session_.materialize()
+        # mt = self.info_session_.materialize()
         is_ = self.info_session_ > datetime.date(1999, 1, 1)
 
         sql = is_.genSQL
         self.assertEqual(sql, "")
 
-
+    def test_date(self):
+        is_ = self.info_session_ > datetime.date(1999, 1, 1)
+        sql = is_.genSQL
+        self.assertEqual(sql, "SELECT CASE WHEN 1 <> 1 THEN TRUE ELSE FALSE END AS session_id, "
+                              "CASE WHEN date > '1999-01-01' THEN TRUE ELSE FALSE END AS date, "
+                              "CASE WHEN 1 <> 1 THEN TRUE ELSE FALSE END AS language, CASE WHEN"
+                              " 1 <> 1 THEN TRUE ELSE FALSE END AS prac_id FROM (SELECT * FROM "
+                              "info_session) info_session")
 if __name__ == '__main__':
     unittest.main()

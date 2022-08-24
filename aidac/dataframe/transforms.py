@@ -814,7 +814,7 @@ class SQLFilterTransform(SQLTransform):
 
     def is_same_type(self, o1, o2):
         if self.is_date_time(o1):
-            return "datetime" in str(o2)
+            return "date" in str(o2)
 
         if self.is_int(o1):
             return "int" in str(o2)
@@ -859,14 +859,15 @@ class SQLFilterTransform(SQLTransform):
         for c in self.columns:
             col = self.columns[c]
             col_type = col.dtype
+            print(" COLUMN DATETYPE IS : ", col_type)
             col_name = col.name
             if self.is_same_type(self._other_, col_type) and not self.is_date_time(self._other_):
                 # print("dddddddd")
                 sqltext += "CASE WHEN " + col_name + " " + op_formula[0] + " " + str(
                     self._other_) + " THEN TRUE ELSE FALSE END AS " + col_name + ", "
-            # elif self.is_same_type(self._other_, col_type) and self.is_date_time(self._other_):
-            #     sqltext += "CASE WHEN " + col_name + " " + op_formula[0] + " " + str(
-            #         self._other_) + " THEN TRUE ELSE FALSE END AS " + col_name + ", "
+            elif self.is_same_type(self._other_, col_type) and self.is_date_time(self._other_):
+                sqltext += "CASE WHEN " + col_name + " " + op_formula[0] + " " + "'" + str(
+                    self._other_) + "'" +" THEN TRUE ELSE FALSE END AS " + col_name + ", "
             else:
                 sqltext += "CASE WHEN" + " 1 " + op_formula[1] + " 1 THEN TRUE ELSE FALSE END AS " + col_name + ", "
 
