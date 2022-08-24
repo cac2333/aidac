@@ -56,8 +56,8 @@ class ResultSet:
             return tp
 
         for idx1, col in enumerate(self.columns):
-            tp = type(self.data[0][idx1])  #
-            # tp = _gen_type(self.data, 0, idx1)
+            # tp = type(self.data[0][idx1])
+            tp = _gen_type(self.data, 0, idx1)
             if tp == str:
                 tp = object  #
 
