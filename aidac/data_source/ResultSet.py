@@ -40,11 +40,27 @@ class ResultSet:
         return rs
 
     def get_result_table(self):
+
         od = collections.OrderedDict()
+
+        def _gen_type(data, row, col):
+
+            row_max = len(data)
+            col_max = len(data[0])
+            tp = type(data[row][col])
+
+            while tp == type(None) and row < row_max:
+                row += 1
+                tp = type(data[row][col])
+
+            return tp
+
         for idx1, col in enumerate(self.columns):
-            tp = type(self.data[0][idx1])
+            tp = type(self.data[0][idx1])  #
+            # tp = _gen_type(self.data, 0, idx1)
             if tp == str:
-                tp = object
+                tp = object  #
+
             od[col.name] = np.empty(len(self.data), dtype=tp)
             for idx2, row in enumerate(self.data):
                 try:
@@ -54,10 +70,16 @@ class ResultSet:
                     pass
         return od
 
-
     def to_pd(self):
         """
+        input: columns, data,
+        (call get_result_table)
+
+        output:
+        pandas dataframe
+
+        convert date time into compatible format
+
         convert data and column to pandas
         @return:
         """
-

@@ -1,3 +1,4 @@
+import datetime
 import unittest
 import re
 
@@ -32,6 +33,7 @@ class MyTestCase(unittest.TestCase):
         self.midwife_ = aidac.read_remote_data("p1", "midwife")
         self.users = aidac.read_remote_data('p1', 'users')
         self.review = aidac.read_remote_data('p1', 'review')
+        self.info_session_ = aidac.read_remote_data("p1", "info_session")
 
     def test_remote_project1(self):
         proj1 = self.station[['couple_id', 'hcardid', 'sid']]
@@ -214,6 +216,14 @@ class MyTestCase(unittest.TestCase):
         sql = ct.transform.genSQL
 
         self.assertEqual(sql, "")
+
+    def test_materialize(self):
+        mt = self.info_session_.materialize()
+        is_ = self.info_session_ > datetime.date(1999, 1, 1)
+
+        sql = is_.genSQL
+        self.assertEqual(sql, "")
+
 
 if __name__ == '__main__':
     unittest.main()

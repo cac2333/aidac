@@ -128,15 +128,21 @@ class Executable:
         # print('process, planned job={}'.format(self.planned_job))
         start = time.time()
         if self.planned_job == LOCAL_DS:
+            # local pandas operation
             assert self.to_be_executed_locally(self.df)
             data = self.perform_local_operation(self.df)
         else:
+            # materialize remote table
+
             sql = self.df.genSQL
             print('sql generated: \n{}'.format(sql))
             ds = manager.get_data_source(self.planned_job)
+
             rs = ds._execute(sql)
+
             returned = time.time()
             data = rs.get_result_table()
+            # get result table and convert to dataframe
             print('sql time = {}, conversion time = {}'.format(returned-start, time.time()-returned))
             data = pd.DataFrame(data)
         self.clear_lineage()

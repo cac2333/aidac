@@ -81,6 +81,7 @@ class DataFrame:
 
     @local_frame_wrapper
     def __getitem__(self, key):
+
         if isinstance(key, DataFrame):
             # todo: selection
             pass
@@ -298,42 +299,42 @@ class DataFrame:
 
     @local_frame_wrapper
     def __eq__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
             trans = SQLFilterTransform(self, "eq", other)
             return DataFrame(self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __ge__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
             trans = SQLFilterTransform(self, "ge", other)
             return DataFrame(self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __gt__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
             trans = SQLFilterTransform(self, "gt", other)
             return DataFrame(self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __ne__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
             trans = SQLFilterTransform(self, "ne", other)
             return DataFrame(self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __lt__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
             trans = SQLFilterTransform(self, "lt", other)
             return DataFrame(self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __le__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
             trans = SQLFilterTransform(self, "le", other)
             return DataFrame(self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")

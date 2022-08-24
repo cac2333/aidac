@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections
 import copy
+import datetime
 import re
 import weakref
 from collections.abc import Iterable
@@ -808,13 +809,22 @@ class SQLFilterTransform(SQLTransform):
     def is_float(self, o):
         return isinstance(o, float)
 
+    def is_date_time(self, o):
+        return isinstance(o, datetime.date)
+
     def is_same_type(self, o1, o2):
+        if self.is_date_time(o1):
+            return "datetime" in str(o2)
+
         if self.is_int(o1):
             return "int" in str(o2)
         if self.is_float(o1):
             return "float" in str(o2) or "double" in str(o2) or "single" in str(o2)
         if self.is_string(o1):
             return "obj" in str(o2)
+
+
+
 
     @property
     def genSQL(self):
@@ -850,9 +860,13 @@ class SQLFilterTransform(SQLTransform):
             col = self.columns[c]
             col_type = col.dtype
             col_name = col.name
-            if self.is_same_type(self._other_, col_type):
+            if self.is_same_type(self._other_, col_type) and not self.is_date_time(self._other_):
+                # print("dddddddd")
                 sqltext += "CASE WHEN " + col_name + " " + op_formula[0] + " " + str(
                     self._other_) + " THEN TRUE ELSE FALSE END AS " + col_name + ", "
+            # elif self.is_same_type(self._other_, col_type) and self.is_date_time(self._other_):
+            #     sqltext += "CASE WHEN " + col_name + " " + op_formula[0] + " " + str(
+            #         self._other_) + " THEN TRUE ELSE FALSE END AS " + col_name + ", "
             else:
                 sqltext += "CASE WHEN" + " 1 " + op_formula[1] + " 1 THEN TRUE ELSE FALSE END AS " + col_name + ", "
 
