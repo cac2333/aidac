@@ -3,12 +3,15 @@ from __future__ import annotations
 import datetime
 import numbers
 import re
+import warnings
 from abc import abstractmethod
 import collections
 
 import numpy as np
-from typing import Union, List, Dict
+from typeguard import check_type
+from typing import Dict
 
+from aidac.common.aidac_types import *
 from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource, local_ds
 from aidac.dataframe.transforms import *
@@ -34,18 +37,34 @@ def local_frame_wrapper(func):
             return DataFrame(pdf, ds=local_ds)
         else:
             df = func(self, *args, **kwargs)
+            df.source_table = self.source_table
             df._saved_func_name_ = func_name
             df._saved_args_ = args
             df._saved_kwargs_ = kwargs
             return df
+    return inner
 
+
+def binary_op_local_frame_wrapper(func):
+    def inner(self, other):
+        func_name = func.__name__
+        if self.data is not None:
+            if is_type(other, ConstantTypes) or (is_type(other, DataFrame) and other.data is not None):
+                pd_func = getattr(self.data, func_name)
+                pdf = pd_func(other)
+                return DataFrame(pdf, ds=local_ds)
+        df = func(self, other)
+        df.source_table = self.source_table
+        df._saved_func_name_ = func_name
+        df._saved_args_ = other
+        return df
     return inner
 
 
 class DataFrame:
     tid = 1
 
-    def __init__(self, data=None, table_name=None, transform=None, ds=None):
+    def __init__(self, data=None, table_name=None, transform=None, ds=None, db_persistent=False):
         DataFrame.tid += 1
         tid_str = str(transform) + str(DataFrame.tid)
         self.__tid__ = re.sub(r'\W+', '_', tid_str)
@@ -58,19 +77,24 @@ class DataFrame:
         self._saved_func_name_ = None
         self._saved_args_ = []
         self._saved_kwargs_ = {}
+        self._db_persistent = db_persistent
 
     """
     override so that any unsupported function call directly goes to pandas 
     """
 
     def __getattr__(self, item):
+        print(self)
         def dataframe_wrapper(*args, **kwargs):
             func_name = item
             if self.data is None:
                 self.materialize()
-            pd_func = getattr(pd.DataFrame, func_name)
-            pdf = pd_func(self.data, *args, **kwargs)
-            return DataFrame(pdf, ds=local_ds)
+            try:
+                pd_func = getattr(pd.DataFrame, func_name)
+                pdf = pd_func(self.data, *args, **kwargs)
+                return DataFrame(pdf, ds=local_ds)
+            except Exception as e:
+                raise e
 
         at = dataframe_wrapper
         print('Method/attribute {} is not supported in AIDAC dataframe, '
@@ -125,7 +149,7 @@ class DataFrame:
 
     @property
     def table_name(self):
-        return self.source_table if self.source_table else self.__tid__
+        return self.source_table if self._db_persistent else self.__tid__
 
     @property
     def genSQL(self):
@@ -164,7 +188,7 @@ class DataFrame:
                     cols[cname] = Column(cname, ctype)
                 self._columns_ = cols
             else:
-                if self.source_table is None:
+                if not self._db_persistent:
                     assert self.transform is not None, "A table without a remote database table linked to it must have a transform"
                     # materialize column info
                     self._columns_ = self.transform.columns
@@ -189,20 +213,20 @@ class DataFrame:
         """
         pass
 
-    def merge(self, other, on=None, left_on=None, right_on=None, how='left', suffix=('_x', '_y'), sort=False):
+    def merge(self, other, on=None, left_on=None, right_on=None, how='left', suffixes=('_x', '_y'), sort=False):
         # local table, eager execution
         if self.data is not None and other.data is not None:
-            rs = self.data.merge(other.data, on, how, left_on=left_on, right_on=right_on,
-                                 suffix=suffix, sort=sort)
+            rs = self.data.merge(other.data, on=on, how=how, left_on=left_on, right_on=right_on,
+                                 suffixes=suffixes, sort=sort)
             tb = DataFrame(data=rs, ds=local_ds)
         else:
             func_name = 'merge'
             saved_args = {'on': on, 'how': how, 'left_on': left_on, 'right_on': right_on,
-                          'suffixes': suffix, 'sort': sort}
+                          'suffixes': suffixes, 'sort': sort}
             if left_on and right_on:
-                trans = SQLJoinTransform(self, other, left_on, right_on, how, suffix)
+                trans = SQLJoinTransform(self, other, left_on, right_on, how, suffixes)
             else:
-                trans = SQLJoinTransform(self, other, on, on, how, suffix)
+                trans = SQLJoinTransform(self, other, on, on, how, suffixes)
 
             tb = DataFrame(transform=trans)
             tb._saved_func_name_ = func_name
@@ -302,6 +326,7 @@ class DataFrame:
         return self._data_.to_json(path_or_buf, orient, date_format, double_precision, force_ascii, date_unit,
                                    default_handler, lines, compression, index, indent, storage_options)
 
+    @binary_op_local_frame_wrapper
     def __add__(self, other):
         # add a number to the dataframe
         if isinstance(other, numbers.Number):
@@ -312,12 +337,43 @@ class DataFrame:
             raise TypeError('Addition with {} is not supported'.format(type(other)))
         return DataFrame(ds=self.data_source, transform=trans)
 
+    @binary_op_local_frame_wrapper
+    def __sub__(self, other):
+        # add a number to the dataframe
+        if isinstance(other, numbers.Number):
+            trans = SQLBinaryOperationTransform(self, '-', other, True)
+        elif isinstance(other, DataFrame):
+            trans = SQLBinaryOperationTransform(self, '-', other)
+        else:
+            raise TypeError('Subtraction with {} is not supported'.format(type(other)))
+        return DataFrame(ds=self.data_source, transform=trans)
+
+    def __rsub__(self, other):
+        if isinstance(other, numbers.Number):
+            trans = SQLBinaryOperationTransform(self, '-', other, True)
+        else:
+            raise TypeError('Subtraction with {} is not supported'.format(type(other)))
+        return DataFrame(ds=self.data_source, transform=trans)
+
+    @binary_op_local_frame_wrapper
     def __mul__(self, other):
-        if isinstance(other, numbers.Number) or isinstance(other, DataFrame):
+        if isinstance(other, numbers.Number):
+            trans = SQLBinaryOperationTransform(self, '*', other, True)
+        elif isinstance(other, DataFrame):
             trans = SQLBinaryOperationTransform(self, '*', other)
-            return DataFrame(ds=self.data_source, transform=trans)
         else:
             raise TypeError('Multiplication with {} is not supported'.format(type(other)))
+        return DataFrame(ds=self.data_source, transform=trans)
+
+    @binary_op_local_frame_wrapper
+    def __truediv__(self, other):
+        if isinstance(other, numbers.Number):
+            trans = SQLBinaryOperationTransform(self, '/', other, True)
+        elif isinstance(other, DataFrame):
+            trans = SQLBinaryOperationTransform(self, '/', other)
+        else:
+            raise TypeError('True division with {} is not supported'.format(type(other)))
+        return DataFrame(ds=self.data_source, transform=trans)
 
     @local_frame_wrapper
     def __eq__(self, other):
@@ -382,11 +438,109 @@ class DataFrame:
 
     @property
     def table_name(self):
-        return self.source_table if self.source_table else self.__tid__
+        return self.source_table if self._db_persistent else self.__tid__
 
     @classmethod
     def read_orc(cls, path, columns=None, **kwargs):
         return DataFrame(pd.read_orc(columns, **kwargs))
+
+    #######################################
+    #
+    # functions to be used only by the wrapper
+    #
+    #######################################
+
+    def _validate_input_column_size(self, key, val):
+        # validate the type of the input
+        if not (is_type(val, ArrayLike) or is_type(val, DataFrame) or is_type(val, ConstantTypes)):
+            raise TypeError("Assigning unsupported type to DataFrame column")
+
+        # validate the size of the input
+        if is_type(key, ArrayLike):
+            # todo: validate row size
+            # multiple key, must match multiple columns
+            # if dataframe's column num/ array column num does not match the key num
+            if (is_type(val, DataFrame) and len(key) != len(val.columns)) \
+                    or (is_type(val, ArrayLike) and len(key) != np.shape(val)[-1]):
+                    raise ValueError('Columns must have the same length as the keys')
+        else:
+            if is_type(val, DataFrame) and len(val.columns) != 1:
+                raise ValueError('Assigned Dataframe has different column length')
+
+    def _handle_df_cols(self, key, val):
+        # todo: self source table is product of previous merge
+        one_table = True
+
+        col = val
+        if col.source_table != self.source_table:
+            warnings.warn('Assigned column(s) from a different table. Data will be handled locally')
+            one_table = False
+
+        if one_table:
+            new_col = Column(key, col.dtype, table=col.tablename, transform=col.column_expr)
+        return new_col
+
+    def _format_column(self, key, val):
+        if is_type(val, ConstantTypes):
+            new_col = Column(key, type(val))
+            if is_type(val, NumericTypes):
+                new_col.column_expr = str(val)
+            else:
+                new_col.column_expr = '\''+val+'\''
+            return new_col
+
+    def project(self, key, val):
+        """
+        @param key: column name
+        @param val: dataframe
+        @return:
+        """
+        # If data is local, let pandas handle the rest
+        # When data is remote, check if column length matches.
+        # Then check if the columns are from the same table or constant, if so, then rewrite and store the sql query
+        # Otherwise check if the row size matches using estimation of both source data and value to be assigned
+
+        # There is no corresponding pd function, have to invoke local pandas function manually
+        if self.data is not None:
+            pdf = self.data[key]
+            if isinstance(val, DataFrame):
+                val = val.data
+            pdf[key] = val
+            return DataFrame(pdf)
+
+        # validate the input having the correct size
+        self._validate_input_column_size(key, val)
+
+        all_cols = self.columns
+
+        # check the type of val and create corresponding column object
+        if is_type(key, ArrayLike):
+            if not is_type(val, DataFrame):
+                for k, v in zip(key, val):
+                    const_col = self._format_column(k, v)
+                    if const_col:
+                        all_cols[k] = const_col
+            else:
+                # check the key and the df have the same column length
+                if len(key) != len(val.columns):
+                    raise ValueError('The data to be assigned must have the same dimension as the keys')
+                else:
+                    for k, v in zip(key, val.columns):
+                        new_col = self._handle_df_cols(k, v)
+                        if new_col:
+                            all_cols[k] = new_col
+        else:
+            # we only allow 1 column to be assigned to a new column for now
+            if len(val.columns) != 1:
+                raise ValueError('Can only assign dim-1 vector to a column')
+
+            new_col = self._handle_df_cols(key, list(val.columns.values())[0])
+            if new_col:
+                all_cols[key] = new_col
+
+        trans = SQLProjectionTransform(self, all_cols)
+        tb = DataFrame(transform=trans, ds=self.data_source)
+        return tb
 
 
 class RemoteTable(DataFrame):
@@ -404,11 +558,3 @@ class RemoteTable(DataFrame):
         self.other_ds = []
 
 
-def read_csv(path, delimiter, header, names) -> DataFrame:
-    df = pd.read_csv(path, delimiter=delimiter, header=header, names=names)
-    return DataFrame(data=df, ds=local_ds)
-
-
-def from_dict(data):
-    df = pd.DataFrame(data)
-    return DataFrame(data=df, ds=local_ds)

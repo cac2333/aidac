@@ -50,7 +50,7 @@ class Scheduler:
             stack = [df]
             while stack:
                 cur = stack.pop()
-                if cur._data_ is not None or cur.source_table is not None:
+                if cur._data_ is not None or cur._db_persistent:
                     return ex1
                 else:
                     assert cur.transform is not None

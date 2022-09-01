@@ -17,9 +17,8 @@ class MyTestCase(unittest.TestCase):
         self.assertIn('salary', cols)
 
         self.assertEqual(cols.get('id').dtype, np.int64)
-        self.assertEqual(cols.get('name').dtype, object)
+        self.assertEqual(cols.get('name').dtype, np.object)
         self.assertEqual(cols.get('salary').dtype, np.float64)
-
 
 
 if __name__ == '__main__':

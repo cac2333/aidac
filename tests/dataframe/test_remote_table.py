@@ -53,9 +53,26 @@ class MyTestCase(unittest.TestCase):
                     'SELECT ((1+prac_id)*prac_id) AS prac_id FROM (SELECT prac_id AS prac_id FROM'
                     ' (SELECT * FROM midwife) midwife) SQLProjectionTransform9')
 
-    def test_set_item(self):
-        self.midwife_['new_id'] = self.midwife_['prac_id'] + 1
-        sql
+    def test_set_item1(self):
+        self.midwife_['new_id'] = (self.midwife_['prac_id'] + 1 ) * self.midwife_['prac_id']
+        self.assertCountEqual(self.midwife_.columns.keys(), ['prac_id', 'new_id', 'name', 'phone', 'email', 'iid'])
+        sql = self.midwife_.genSQL
+        self.assertEqual(sql,     'SELECT prac_id AS prac_id, email AS email, name AS name, '
+                                'phone AS phone, iid AS iid, (prac_id*(1+prac_id)) AS new_id '
+                                  'FROM (SELECT * FROM midwife) midwife')
+
+        self.assertEqual(len(self.midwife_._frame_stubs), 2)
+        self.assertTrue(self.midwife_._frame_stubs[0].transform is None)
+        self.assertTrue(isinstance(self.midwife_._frame_stubs[1].transform, SQLProjectionTransform))
+
+    def test_set_item2(self):
+        self.midwife_[['const_id1', 'const_id2']] = [1, 'str1']
+        self.assertCountEqual(self.midwife_.columns.keys(), ['prac_id', 'const_id1','const_id2', 'name', 'phone', 'email', 'iid'])
+        sql = self.midwife_.genSQL
+        self.assertEqual(sql,     'SELECT prac_id AS prac_id, email AS email, name AS name, '
+                                'phone AS phone, iid AS iid, 1 AS const_id1, \'str1\' AS const_id2 '
+                                  'FROM (SELECT * FROM midwife) midwife')
+        self.midwife_.materialize()
 
     def test_remote_join(self):
         jn = self.users.merge(self.review, 'userid', 'inner')
@@ -73,10 +90,6 @@ class MyTestCase(unittest.TestCase):
         self.assertTrue(isinstance(order_.transform, SQLOrderTransform))
         sql = order_.transform.genSQL
         self.assertEqual(sql, 'SELECT * FROM couple ORDER BY sid asc')
-
-    # def test_schdule1(self):
-    #     proj = self.station['sid']
-    #     proj.materialize()
 
 
     def test_group_by(self):
@@ -209,6 +222,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(sql2,"SELECT count(prac_id) AS count_prac_id, max(prac_id) AS max_prac_id,"
                               " count(email) AS count_email, count(iid) AS count_iid, avg(iid) AS a"
                               "vg_iid FROM (SELECT * FROM midwife)midwife GROUP BY iid ORDER BY iid")
+
 
 if __name__ == '__main__':
     unittest.main()

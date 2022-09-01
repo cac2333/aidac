@@ -1,4 +1,4 @@
-import aidac.dataframe.frame as frame
+import aidac.dataframe.frame_wrapper as frame
 # from aidac.dataframe.LocalTable import read_csv
 from aidac.dataframe.Scheduler import Scheduler
 from aidac.data_source.DataSourceManager import *

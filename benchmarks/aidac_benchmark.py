@@ -41,7 +41,7 @@ def my_query_01():
     @param db:
     @return:
     """
-    o = read_file('orders')
+    o = read_file('orders')[['o_orderkey', 'o_orderdate', 'o_shippriority']].head(100)
     l = pd.read_remote_data('p1', 'lineitem')
     t = o.merge(l, left_on='o_orderkey', right_on='l_orderkey')
     t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority')).agg('count')
@@ -92,28 +92,26 @@ def q_03_v1():
     o = o.query('o_orderdate < \'1995-3-15\'')
     o = o[['o_orderdate', 'o_shippriority', 'o_orderkey', 'o_custkey']]
     l = l.query('l_shipdate > \'1995, 3, 15\'')
-    # l['revenue'] = l['l_extendedprice'] * (1 - l['l_discount'])
-    l = l[['l_orderkey', 'l_extendedprice']]
+    l['revenue'] = l['l_extendedprice'] * (1 - l['l_discount'])
+    l = l[['l_orderkey', 'revenue']]
 
     t = c.merge(o, left_on='c_custkey', right_on='o_custkey', how='inner')
     t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey', how='inner')
-    t = t[['l_orderkey', 'l_extendedprice', 'o_orderdate', 'o_shippriority']]
-    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority')).agg('sum', ['l_extendedprice'])
-    # t.sort_values(['revenue', 'o_orderdate'], ascending=[False, True], inplace=True)
-    # t.sort_values(['l_extendedprice', 'o_orderdate'], ascending=[False, True])
+    t = t[['l_orderkey', 'revenue', 'o_orderdate', 'o_shippriority']]
+    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority'), sort=False).agg({'revenue': 'sum'})
     print(t.genSQL)
     return t
 
 def measure_time(func, *args):
     start = time.time()
-    rs = func(*args).materialize()
-    # rs = rs.materilazie()
+    rs = func(*args)
+    rs.materialize()
+    print(rs.data)
     end = time.time()
-    print(rs)
     print('Function {} takes time {}'.format(func, end-start))
 
 
 if __name__ == '__main__':
     connect('127.0.0.1', 'sf01', 'sf01', 5432, 'postgres', 'postgres')
-    measure_time(my_query_01)
+    measure_time(q_03_v1)
     # udf_func()

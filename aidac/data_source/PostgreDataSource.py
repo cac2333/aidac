@@ -61,8 +61,8 @@ class PostgreDataSource(DataSource):
         qry = ql.table_columns(table)
         rs = self._execute(qry)
         # expected return value from pg:
-        # schemaname, tablename, columnname, columntype, columnsize, columnpos, nullable
-        cols = [Column(x[2], typeConverter_rev[x[3]], x[1], x[0], constant_converter[x[-1]]) for x in rs.data]
+        # returned value: schemaname, tablename, columnname, columntype, columnsize, columnpos, nullable
+        cols = [Column(x[2], typeConverter_rev[x[3]], x[1], x[0], constant_converter[x[-1]], x[2], source_table=x[1]) for x in rs.data]
         return cols
 
     def row_count(self, table: str):

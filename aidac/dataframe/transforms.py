@@ -169,11 +169,13 @@ class SQLAggregateTransform(SQLTransform):
                 else:
                     srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
                     sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
+                    srcol_db = scol.source_table
 
                 column = Column(projcoln, scol.dtype)
                 column.srccol = srccols
                 column.tablename = sdbtables
                 column.transform = coltransform
+                column.source_table = srcol_db
                 columns[projcoln] = column
             self._columns_ = columns
 
@@ -209,27 +211,35 @@ class SQLAggregateTransform(SQLTransform):
 
 
 class SQLBinaryOperationTransform(SQLTransform):
-    def __init__(self, source, op, other, is_num=False):
+    def __init__(self, source, op, other, is_num=False, reverse=False):
         super().__init__(source)
         self.op = op
         self._other_ = other
         self._is_num_ = is_num
+        self._reverse_ = reverse
 
     def _col_exp(self, col):
-        sc = self._source_.columns
+        col_exp = col.column_expr if col.column_expr else col.full_name()
         if self._is_num_:
             # single column operation
-            return '('+str(self._other_) + self.op + col.full_name()+')'
+            if self._reverse_:
+                exp = '(' + col_exp + self.op + str(self._other_)+')'
+            else:
+                exp = '(' + str(self._other_) + self.op + col_exp + ')'
+            return exp
         else:
             # todo: add multi column operation
             oc = self._other_.columns
+            assert(len(oc) == 1)
             ocol_name = next(iter(oc))
             ocol = oc[ocol_name]
             if ocol.column_expr:
                 other_text = ocol.column_expr
             else:
                 other_text = ocol.full_name()
-            return '('+other_text + self.op + col.full_name()+')'
+
+            # should not worry about the reverse operation
+            return '('+other_text + self.op + col_exp+')'
 
     @property
     def columns(self):
@@ -239,7 +249,6 @@ class SQLBinaryOperationTransform(SQLTransform):
                 # todo: update column name
                 col = self._columns_[col_name]
                 # need to assign table name before column expression
-                col.tablename = [self._source_.table_name]
                 col.column_expr = self._col_exp(col)
         return self._columns_
 
@@ -259,6 +268,7 @@ class SQLBinaryOperationTransform(SQLTransform):
             else:
                 return 'SELECT ' + projcoltxt + ' FROM (' + self._source_.genSQL + ') ' + self._source_.table_name
 
+
 class SQLProjectionTransform(SQLTransform):
     def __init__(self, source, projcols):
         super().__init__(source)
@@ -268,12 +278,12 @@ class SQLProjectionTransform(SQLTransform):
         if not self._columns_:
             colcount = 0
 
-            def _get_proj_col_info(c: dict | str):
+            def _get_proj_col_info(c: tuple | str):
                 nonlocal colcount
                 colcount += 1
-                if isinstance(c, dict):  # check if the projected column is given an alias name
-                    sc1 = list(c.keys())[0]  # get the source column name / function
-                    pc1 = c.get(sc1)  # and the alias name for projection.
+                if isinstance(c, tuple):  # check if the projected column is given an alias name
+                    sc1 = c[0] # get the source column name / function
+                    pc1 = c[1]  # and the alias name for projection.
                 else:
                     sc1 = pc1 = c  # otherwise projected column name / function is the same as the source column.
                 # we only consider one possible source column as the renaming is one-one
@@ -290,7 +300,9 @@ class SQLProjectionTransform(SQLTransform):
             src_cols = source.columns
             # columns = {};
             columns = collections.OrderedDict();
-            for col in self._projcols_:
+
+            proj_cols = self._projcols_.items() if hasattr(self._projcols_, 'items') else self._projcols_
+            for col in proj_cols:
                 srccol, projcoln, coltransform = _get_proj_col_info(col)
 
                 sdbtables = []
@@ -301,11 +313,13 @@ class SQLProjectionTransform(SQLTransform):
                 else:
                     srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
                     sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
+                    srcol_db = scol.source_table
 
                 column = Column(projcoln, scol.dtype)
                 column.srccol = srccols
                 column.tablename = sdbtables
-                column.transform = coltransform
+                column.column_expr = coltransform
+                column.source_table = srcol_db
                 columns[projcoln] = column
             self._columns_ = columns
 
