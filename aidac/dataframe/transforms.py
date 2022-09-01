@@ -748,19 +748,19 @@ class SQLContainsTransform(SQLTransform):
             sqltext = 'SELECT * FROM ' + '(' + self._source_.genSQL + ') ' + self._source_.table_name + ' WHERE ' + 'LOWER' + '(' + col.name + ')' + ' '
             self._pattern_ = self._pattern_.lower()
             if self._regex_:
-                sqltext += 'LIKE' + ' ' + self._pattern_
+                sqltext += 'LIKE' + ' ' + "'" + self._pattern_ + "'"
                 return sqltext
             else:
-                sqltext += 'LIKE' + ' ' + '%' + self._pattern_ + '%'
+                sqltext += 'LIKE' + ' ' + "'" + '%' + self._pattern_ + '%' + "'"
                 return sqltext
 
         else:
-            sqltext = 'SELECT * FROM ' + '(' + self._source_.genSQL + ') ' + self._source_.table_name + ' WHERE ' + col.name
+            sqltext = 'SELECT * FROM ' + '(' + self._source_.genSQL + ') ' + self._source_.table_name + ' WHERE ' + col.name + ' '
             if self._regex_:
-                sqltext += 'LIKE' + ' ' + self._pattern_
+                sqltext += 'LIKE' + ' ' + "'" + self._pattern_ + "'"
                 return sqltext
             else:
-                sqltext += 'LIKE' + ' ' + '%' + self._pattern_ + '%'
+                sqltext += 'LIKE' + ' ' + "'" + '%' + self._pattern_ + '%' + "'"
                 return sqltext
         # if self._regex_:
         #     sqltext += 'LIKE' + ' ' + self._pattern_

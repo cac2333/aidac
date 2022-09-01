@@ -89,7 +89,7 @@ class DataFrame:
         raise ValueError(f"operation only supports Series with number of columns = 1!")
 
     @local_frame_wrapper
-    def __contains__(self, pat: str, case = True, regex = True):
+    def contains(self, pat: str, case = True, regex = True):
 
         transform = SQLContainsTransform(self, pat, case, regex)
         return DataFrame(ds=self.data_source, transform=transform)
@@ -399,9 +399,6 @@ class DataFrame:
     def read_orc(cls, path, columns=None, **kwargs):
         return DataFrame(pd.read_orc(columns, **kwargs))
 
-    def contains(self, condition, regex = True):
-        trans = SQLContainTransform(self, condition, regex)
-        return DataFrame(self.data_source, transform=trans)
 
 class RemoteTable(DataFrame):
     def __init__(self, source: DataSource = None, transform: Transform = None, table_name: str = None):

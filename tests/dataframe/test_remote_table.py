@@ -248,8 +248,29 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(mw_sql, "SELECT email AS email FROM (SELECT * FROM midwife) midwife")
 
         mw_contains_1 = mw_series.contains("w", regex = True, case = True)
-        # mw_contains_2 = mw_series.contains("w", regex=True, case=False)
-        # mw_contains_3 = mw_series.contains("w", regex = False, case = True)
-        # mw_contains_4 = mw_series.contains("w", regex=False, case=False)
+        mw_contains_2 = mw_series.contains("WFW", regex=True, case=False)
+        mw_contains_3 = mw_series.contains("WW", regex = False, case = True)
+        mw_contains_4 = mw_series.contains("eWFW", regex=False, case=False)
+
+        mw_sql1 = mw_contains_1.genSQL
+        mw_sql2 = mw_contains_2.genSQL
+        mw_sql3 = mw_contains_3.genSQL
+        mw_sql4 = mw_contains_4.genSQL
+
+        self.assertEqual(mw_sql1, "SELECT * FROM (SELECT email AS email FROM (SELECT * FROM midwife"
+                                  ") midwife) SQLProjectionTransform8 WHERE email LIKE '%w%'")
+
+        self.assertEqual(mw_sql2, "SELECT * FROM (SELECT email AS email FROM (SELECT * FROM midwife"
+                                  ") midwife) SQLProjectionTransform8 WHERE LOWER(email) LIKE '%wfw"
+                                  "%'")
+
+        self.assertEqual(mw_sql3, "SELECT * FROM (SELECT email AS email FROM (SELECT * FROM midwife"
+                                  ") midwife) SQLProjectionTransform8 WHERE email LIKE '%WW%'")
+
+        self.assertEqual(mw_sql4, "SELECT * FROM (SELECT email AS email FROM (SELECT * FROM midwife"
+                                  ") midwife) SQLProjectionTransform8 WHERE LOWER(email) LIKE '%ewfw%'")
+
+
+
 if __name__ == '__main__':
     unittest.main()
