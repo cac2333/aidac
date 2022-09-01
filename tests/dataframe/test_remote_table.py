@@ -232,5 +232,24 @@ class MyTestCase(unittest.TestCase):
                               "CASE WHEN 1 <> 1 THEN TRUE ELSE FALSE END AS language, CASE WHEN"
                               " 1 <> 1 THEN TRUE ELSE FALSE END AS prac_id FROM (SELECT * FROM "
                               "info_session) info_session")
+
+    def test_yrs(self):
+        is_ = self.info_session_ > datetime.date(1999, 1, 1).year
+        sql = is_.genSQL
+        self.assertEqual(sql, "") # should be error
+
+    def test_contains_2(self):
+
+        mw = self.midwife_
+        mw_series = mw["email"].str
+
+        mw_sql = mw_series.genSQL
+
+        self.assertEqual(mw_sql, "SELECT email AS email FROM (SELECT * FROM midwife) midwife")
+
+        mw_contains_1 = mw_series.contains("w", regex = True, case = True)
+        # mw_contains_2 = mw_series.contains("w", regex=True, case=False)
+        # mw_contains_3 = mw_series.contains("w", regex = False, case = True)
+        # mw_contains_4 = mw_series.contains("w", regex=False, case=False)
 if __name__ == '__main__':
     unittest.main()

@@ -8,6 +8,8 @@ import collections
 import numpy as np
 from typing import Union, List, Dict
 
+from _distutils_hack import override
+
 from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource, local_ds
 from aidac.dataframe.transforms import *
@@ -58,9 +60,40 @@ class DataFrame:
         self._saved_args_ = []
         self._saved_kwargs_ = {}
 
+        # self.str = None     #return DF
+        '''
+        check type of the column
+        
+        '''
+
+
     """
     override so that any unsupported function call directly goes to pandas 
     """
+    @property
+    def str(self):
+        columns = self.columns
+        is_str = True
+        col_type = None
+        for c in columns:
+            col = columns[c]
+            if col.dtype == object:
+                break
+            else:
+                col_type = col.dtype
+                is_str = False
+        if not is_str:
+            raise ValueError(f"cannot set type {col_type} as str!")
+        if len(columns) == 1:
+            return self
+        raise ValueError(f"operation only supports Series with number of columns = 1!")
+
+    @local_frame_wrapper
+    def __contains__(self, pat: str, case = True, regex = True):
+
+        transform = SQLContainsTransform(self, pat, case, regex)
+        return DataFrame(ds=self.data_source, transform=transform)
+
 
     def __getattr__(self, item):
         def dataframe_wrapper(*args, **kwargs):

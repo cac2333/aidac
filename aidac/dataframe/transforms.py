@@ -712,6 +712,64 @@ class SQLFillNA(SQLTransform):
 
         return sqltext
 
+class SQLContainsTransform(SQLTransform):
+
+    def __init__(self, source, pat, case, regex):
+        super().__init__(source)
+        self._pattern_ = pat
+        self._case_ = case
+        self._regex_ = regex
+
+    @property
+    def columns(self):
+        if not self._columns_:
+            self._columns_ = self._source_.columns
+        return self._columns_
+
+    @property
+    def genSQL(self):
+        col = None
+        for c in self.columns:
+            col = self.columns[c]
+
+
+        is_all_alnum = True
+
+        for i in self._pattern_:
+            if not i.isalnum():
+                is_all_alnum = False
+
+        if self._regex_ and is_all_alnum:
+            self._pattern_ = '%' + self._pattern_ + '%'
+
+        # sqltext = 'SELECT * FROM ' + '(' + self._source_.genSQL + ') ' + self._source_.table_name + ' WHERE ' + col.name + ' '
+
+        if not self._case_:
+            sqltext = 'SELECT * FROM ' + '(' + self._source_.genSQL + ') ' + self._source_.table_name + ' WHERE ' + 'LOWER' + '(' + col.name + ')' + ' '
+            self._pattern_ = self._pattern_.lower()
+            if self._regex_:
+                sqltext += 'LIKE' + ' ' + self._pattern_
+                return sqltext
+            else:
+                sqltext += 'LIKE' + ' ' + '%' + self._pattern_ + '%'
+                return sqltext
+
+        else:
+            sqltext = 'SELECT * FROM ' + '(' + self._source_.genSQL + ') ' + self._source_.table_name + ' WHERE ' + col.name
+            if self._regex_:
+                sqltext += 'LIKE' + ' ' + self._pattern_
+                return sqltext
+            else:
+                sqltext += 'LIKE' + ' ' + '%' + self._pattern_ + '%'
+                return sqltext
+        # if self._regex_:
+        #     sqltext += 'LIKE' + ' ' + self._pattern_
+
+
+
+
+
+
 
 class SQLDropduplicateTransform(SQLTransform):
 
