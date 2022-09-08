@@ -128,15 +128,21 @@ class Executable:
         # print('process, planned job={}'.format(self.planned_job))
         start = time.time()
         if self.planned_job == LOCAL_DS:
+            # local pandas operation
             assert self.to_be_executed_locally(self.df)
             data = self.perform_local_operation(self.df)
         else:
+            # materialize remote table
+
             sql = self.df.genSQL
             print('sql generated: \n{}'.format(sql))
             ds = manager.get_data_source(self.planned_job)
+
             rs = ds._execute(sql)
+
             returned = time.time()
             data = rs.get_result_table()
+            # get result table and convert to dataframe
             print('sql time = {}, conversion time = {}'.format(returned-start, time.time()-returned))
             data = pd.DataFrame(data)
         self.clear_lineage()
@@ -360,9 +366,10 @@ class ScheduleExecutable(Executable):
         # get the merged point transform
         trans = self.prev.transform
         all_dest = []
-        from aidac.dataframe.transforms import SQLJoinTransform
+        from aidac.dataframe.transforms import SQLJoinTransform, SQLProjectionTransform
         # calculate all cost for all possible data transfer
-        if isinstance(trans, SQLJoinTransform):
+        if isinstance(trans, SQLJoinTransform) or isinstance(trans, SQLProjectionTransform):
+            jn_flag = isinstance(trans, SQLJoinTransform)
             # we can assume the result set location will be the transfer destination
             # we calculate the cost for all possible path
             # (for every previous path we compute the transfer cost between it and every possible new destination)
@@ -370,11 +377,12 @@ class ScheduleExecutable(Executable):
             plan1 = self.prereqs[0].plan()
             plan2 = self.prereqs[1].plan()
 
-            estimate_card = self.estimate_join_card(self.prereqs[0], self.prereqs[1])
+            estimate_card = self.estimate_join_card(self.prereqs[0], self.prereqs[1]) if jn_flag else self.estimate_filter_card(trans)
             self.prev_ex.estimated_row = estimate_card
             # todo: change width
             self.prev_ex.estimated_width = len(self.prev.columns)*4
             all_plans = []
+            # todo: handle projection where the filter comes from a differebt source
             for cost1, path1 in plan1:
                 for cost2, path2 in plan2:
                     # todo: remove redundant expressions
@@ -395,8 +403,6 @@ class ScheduleExecutable(Executable):
                         new_path = Node(path2.val, [path1, path2])
                         new_cost = cost1 + cost2 + self.prior_join_cost(self.prereqs[0], path2.val, path1.val, estimate_card)
                         all_plans.append((new_cost, new_path))
-        else:
-            all_plans = [[0, None]]
         return all_plans
 
     def prior_join_cost(self, other_table, my_dest, other_dest,  joined_card):
@@ -417,6 +423,12 @@ class ScheduleExecutable(Executable):
         joined_card = joined_card if self.rs_required and my_dest != LOCAL_DS else 0
 
         return cost_before + joined_card
+
+    def estimate_filter_card(self, trans):
+        # todo: update the data source to be used
+        self.estimated_row, self.estimated_width = \
+            self.prev.data_source.get_estimation(trans.genSQL)
+        return self.estimated_row * self.estimated_width
 
     def estimate_join_card(self, tbl1, tbl2):
         """

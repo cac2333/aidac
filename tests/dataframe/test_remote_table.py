@@ -1,3 +1,4 @@
+import datetime
 import unittest
 import re
 
@@ -32,6 +33,7 @@ class MyTestCase(unittest.TestCase):
         self.midwife_ = aidac.read_remote_data("p1", "midwife")
         self.users = aidac.read_remote_data('p1', 'users')
         self.review = aidac.read_remote_data('p1', 'review')
+        self.info_session_ = aidac.read_remote_data("p1", "info_session")
 
     def test_remote_project1(self):
         proj1 = self.station[['couple_id', 'hcardid', 'sid']]
@@ -120,6 +122,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(sql, 'SELECT DISTINCT couple_id, hcardid, sid FROM (SELECT * FROM couple) couple')
 
     def test_drop_na(self):
+
         dn = self.coup_.dropna()
         self.assertTrue(isinstance(dn.transform, SQLDropNA))
         sql = dn.transform.genSQL
@@ -140,6 +143,17 @@ class MyTestCase(unittest.TestCase):
         self.assertTrue(isinstance(q2.transform, SQLQuery))
         sql2 = q2.transform.genSQL
         self.assertEqual(sql2, "SELECT * FROM couple WHERE couple_id = 100 and sid <> 0")
+
+    def test_filter(self):
+        fl = self.coup_[self.coup_['couple_id']>10]
+        self.assertCountEqual(fl.columns.keys(), self.coup_.columns.keys())
+        sql1 = fl.genSQL
+        print(sql1)
+
+        fl2 = self.coup_[(self.coup_['couple_id']>10) & (self.coup_['couple_id']<100)]
+        sql2 = fl2.genSQL
+        print(sql2)
+
 
     def test_eq(self):
         eq = self.midwife_ == 6
@@ -181,6 +195,7 @@ class MyTestCase(unittest.TestCase):
                               "TRUE ELSE FALSE END AS phone, CASE WHEN iid >= 6 THEN TRUE ELSE FA"
                               "LSE END AS iid FROM (SELECT * FROM midwife) midwife")
 
+
     def test_le(self):
         le = self.midwife_ <= 6
         self.assertTrue(isinstance(le.transform, SQLFilterTransform))
@@ -207,22 +222,50 @@ class MyTestCase(unittest.TestCase):
                               "TRUE ELSE FALSE END AS phone, CASE WHEN iid < 6 THEN TRUE ELSE FA"
                               "LSE END AS iid FROM (SELECT * FROM midwife) midwife")
 
-    def test_group_agg(self):
+
+    def test_g_aroupgg(self):
         gag = self.midwife_.groupby("iid").agg(func="count")
         # p = gag.columns
 
         sql = gag.transform.genSQL
-        self.assertEqual(sql, "SELECT count(prac_id) AS count_prac_id, count(email) AS count_email,"
-                              " count(name) AS count_name, count(phone) AS count_phone, count(iid) "
-                              "AS count_iid FROM (SELECT * FROM midwife)midwife GROUP BY iid ORDER "
+        self.assertEqual(sql, "SELECT count(prac_id) AS prac_id, count(email) AS email,"
+                              " count(name) AS name, count(phone) AS phone, count(iid) "
+                              "AS iid FROM (SELECT * FROM midwife)midwife GROUP BY iid ORDER "
                               "BY iid")
         #
-        gag2 = self.midwife_.groupby("iid").agg(collist={"prac_id":["count", "max"],"email":"count", "iid":["count", "avg"]})
+        gag2 = self.midwife_.groupby("iid").agg(collist=
+                                                {"prac_id":["count", "max"],
+                                                 "email":"count"})
         sql2 = gag2.transform.genSQL
         self.assertEqual(sql2,"SELECT count(prac_id) AS count_prac_id, max(prac_id) AS max_prac_id,"
-                              " count(email) AS count_email, count(iid) AS count_iid, avg(iid) AS a"
-                              "vg_iid FROM (SELECT * FROM midwife)midwife GROUP BY iid ORDER BY iid")
+                              " count(email) AS email, iid AS iid FROM (SELECT * FROM midwife)midwife GROUP BY iid ORDER BY iid")
 
+        gag2 = self.midwife_.groupby("iid").agg(collist=
+                                                {"prac_id": ["count", "max"],
+                                                 "email": "count",
+                                                 "iid": ["count", "avg"]})
 
+    def test_contains(self):
+
+        ct = self.midwife_[self.midwife_["email"].contains(".com")]
+        sql = ct.transform.genSQL
+
+        self.assertEqual(sql, "")
+
+    def test_materialize(self):
+        # mt = self.info_session_.materialize()
+        is_ = self.info_session_ > datetime.date(1999, 1, 1)
+
+        sql = is_.genSQL
+        self.assertEqual(sql, "")
+
+    def test_date(self):
+        is_ = self.info_session_ > datetime.date(1999, 1, 1)
+        sql = is_.genSQL
+        self.assertEqual(sql, "SELECT CASE WHEN 1 <> 1 THEN TRUE ELSE FALSE END AS session_id, "
+                              "CASE WHEN date > '1999-01-01' THEN TRUE ELSE FALSE END AS date, "
+                              "CASE WHEN 1 <> 1 THEN TRUE ELSE FALSE END AS language, CASE WHEN"
+                              " 1 <> 1 THEN TRUE ELSE FALSE END AS prac_id FROM (SELECT * FROM "
+                              "info_session) info_session")
 if __name__ == '__main__':
     unittest.main()

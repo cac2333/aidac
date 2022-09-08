@@ -103,7 +103,7 @@ class WFrame:
         return WFrame(self._tail_frame.drop_duplicates())
 
     def sort_values(self, orderlist, ascending=True):
-        return WFrame(self._tail_frame.sort_values(orderlist. ascending))
+        return WFrame(self._tail_frame.sort_values(orderlist, ascending))
 
     def query(self, expr: str):
         return WFrame(self._tail_frame.query(expr))
@@ -129,6 +129,9 @@ class WFrame:
 
     def groupby(self, by: Union[List[str], str], sort=True, axis=0):
         return WFrame(self._tail_frame.groupby(by, sort, axis))
+
+    def count(self):
+        return WFrame(self._tail_frame.count())
 
     def to_dict(self, orient, into):
         return self._tail_frame.to_dict(orient, into)
@@ -195,6 +198,16 @@ class WFrame:
         if isinstance(other, WFrame):
             other = other._tail_frame
         return WFrame(self._tail_frame <= other)
+
+    def __and__(self, other):
+        if isinstance(other, WFrame):
+            other = other._tail_frame
+        return WFrame(self._tail_frame & other)
+
+    def __or__(self, other):
+        if isinstance(other, WFrame):
+            other = other._tail_frame
+        return WFrame(self._tail_frame | other)
 
     def to_string(self, buf=None, columns=None, col_space=None, header=True, index=True, na_rep='NaN', formatters=None,
                   float_format=None, sparsify=None, index_names=True, justify=None, max_rows=None, max_cols=None,

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import datetime
+
 import numpy as np
 import pandas
 
@@ -12,6 +14,8 @@ from psycopg2.extensions import register_adapter, AsIs
 
 from aidac.data_source.ResultSet import ResultSet
 
+# datatime.Datetime
+
 DS = 'postgres'
 ql = QueryLoader(DS)
 
@@ -20,11 +24,12 @@ register_adapter(np.int64, AsIs)
 
 typeConverter = { np.int8: 'TINYINT', np.int16: 'SMALLINT', np.int32: 'INT', np.int64: 'NUMERIC'
     , np.float32: 'FLOAT', np.float64: 'FLOAT', np.object: 'VARCHAR(100)', np.object_: 'VARCHAR(100)', bytearray: 'BLOB'
-    , 'date': 'DATE', 'time': 'TIME', 'timestamp': 'TIMESTAMP'};
+    , 'date': 'DATE', 'time': 'TIME', 'timestamp': 'TIMESTAMP', "datetime": datetime.date};
 
 typeConverter_rev = {'integer': np.int32, 'character varying': np.object, 'double precision': np.float64,
                      'numeric': np.float, 'character': np.object,
-                     'boolean': bool, 'date': 'date', 'timestamp without time zone': 'timestamp'}
+                     'boolean': bool, 'date': 'date', 'timestamp without time zone': 'timestamp', "datetime": datetime.date
+                     }
 
 constant_converter = {'YES': True, 'NO': False}
 

@@ -8,8 +8,7 @@ from abc import abstractmethod
 import collections
 
 import numpy as np
-from typeguard import check_type
-from typing import Dict
+from typing import Union, List, Dict
 
 from aidac.common.aidac_types import *
 from aidac.common.column import Column
@@ -83,23 +82,24 @@ class DataFrame:
     override so that any unsupported function call directly goes to pandas 
     """
 
-    def __getattr__(self, item):
-        print(self)
-        def dataframe_wrapper(*args, **kwargs):
-            func_name = item
-            if self.data is None:
-                self.materialize()
-            try:
-                pd_func = getattr(pd.DataFrame, func_name)
-                pdf = pd_func(self.data, *args, **kwargs)
-                return DataFrame(pdf, ds=local_ds)
-            except Exception as e:
-                raise e
-
-        at = dataframe_wrapper
-        print('Method/attribute {} is not supported in AIDAC dataframe, '
-              'using pandas instead'.format(item))
-        return at
+    # def __getattr__(self, item):
+    #     def dataframe_wrapper(*args, **kwargs):
+    #         func_name = item
+    #         if self.data is None:
+    #             self.materialize()
+    #             pd_func = getattr(pd.DataFrame, func_name)
+    #             pdf = pd_func(self.data, *args, **kwargs)
+    #             return DataFrame(pdf, ds=local_ds)
+    #
+    #     if item in self.__dict__:
+    #         at = dataframe_wrapper
+    #     elif item in pd.DataFrame.__dict__:
+    #         at = dataframe_wrapper
+    #         print('Method/attribute {} is not supported in AIDAC dataframe, '
+    #               'using pandas instead'.format(item))
+    #     else:
+    #         raise AttributeError('Dataframe has no attribute {}'.format(item))
+    #     return at
 
     def __str__(self):
         return self.table_name
@@ -115,15 +115,22 @@ class DataFrame:
     def __getitem__(self, key):
         if isinstance(key, DataFrame):
             # todo: selection
-            pass
-        if isinstance(key, list):
+            if not isinstance(key.transform, SQLFilterTransform):
+                raise ValueError('The given dataframe must be a logical expression obtained from comparison')
+            else:
+                if self.source_table != key.source_table:
+                    print('Select on heterogeneous data')
+                else:
+                    trans = SQLProjectionTransform([self, key], self.columns.keys())
+        elif isinstance(key, list):
             keys = key
+            trans = SQLProjectionTransform(self, keys)
         elif isinstance(key, tuple):
             raise ValueError("Multi-level index is not supported")
         else:
             keys = [key]
+            trans = SQLProjectionTransform(self, keys)
 
-        trans = SQLProjectionTransform(self, keys)
         tb = DataFrame(transform=trans, ds=self.data_source)
         return tb
 
@@ -314,6 +321,10 @@ class DataFrame:
 
         return DataFrame(ds=self.data_source, transform=transform)
 
+    def count(self):
+        trans = SQLAGG_Transform(self, func='count', collist=self.columns.keys())
+        return DataFrame(ds=self.data_source, transform=trans)
+
     def to_dict(self, orient, into):
         return self._data_.to_dict(orient, into)
 
@@ -377,45 +388,57 @@ class DataFrame:
 
     @local_frame_wrapper
     def __eq__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
             trans = SQLFilterTransform(self, "eq", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __ge__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
             trans = SQLFilterTransform(self, "ge", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __gt__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
             trans = SQLFilterTransform(self, "gt", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __ne__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
             trans = SQLFilterTransform(self, "ne", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __lt__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
             trans = SQLFilterTransform(self, "lt", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __le__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str):
+        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
             trans = SQLFilterTransform(self, "le", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
+
+    @local_frame_wrapper
+    def __and__(self, other):
+        if isinstance(other, DataFrame) and isinstance(other.transform, SQLFilterTransform):
+            trans = SQLFilterTransform(self, 'AND', other)
+            return DataFrame(ds=self.data_source, transform=trans)
+
+    @local_frame_wrapper
+    def __or__(self, other):
+        if isinstance(other, DataFrame) and isinstance(other.transform, SQLFilterTransform):
+            trans = SQLFilterTransform(self, 'OR', other)
+            return DataFrame(ds=self.data_source, transform=trans)
 
     def to_string(self, buf=None, columns=None, col_space=None, header=True, index=True, na_rep='NaN', formatters=None,
                   float_format=None, sparsify=None, index_names=True, justify=None, max_rows=None, max_cols=None,
@@ -430,7 +453,11 @@ class DataFrame:
                errors='strict', storage_options=None):
         return self._data_.to_csv(path_or_buf, sep, na_rep, float_format, columns, header, index, index_label, mode,
                                   encoding, compression, quoting, quotechar, line_terminator, chunksize, date_format,
-                                  doublequote, escapechar, decimal, errors, storage_options)
+                            doublequote, escapechar, decimal, errors, storage_options)
+
+    def contains(self, condition, regex = True):
+        trans = SQLContainTransform(self, condition, regex)
+        return DataFrame(self.data_source, transform=trans)
 
     @classmethod
     def read_pickle(cls, filepath_or_buffer, compression, dict__, storage_options):

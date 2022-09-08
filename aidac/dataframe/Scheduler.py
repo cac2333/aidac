@@ -55,7 +55,10 @@ class Scheduler:
                 else:
                     assert cur.transform is not None
                     sources = cur.transform.sources()
-                    if isinstance(sources, frame.DataFrame):
+                    from aidac.dataframe.transforms import SQLJoinTransform
+                    from aidac.common.aidac_types import is_type
+                    from aidac.common.aidac_types import ArrayLike
+                    if not is_type(sources, ArrayLike):
                         stack.append(sources)
                     else:
                         sblock = ScheduleExecutable(weakref.proxy(cur), ex1)

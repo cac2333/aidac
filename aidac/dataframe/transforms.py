@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import collections
 import copy
+import datetime
 import re
 import weakref
 from collections.abc import Iterable
 from enum import Enum
 from typing import List
 
+from aidac.common.aidac_types import *
 from aidac.dataframe import frame
 from aidac.common.column import Column
 
@@ -125,6 +127,23 @@ class SQLTransform(Transform):
     def sources(self):
         return self._source_
 
+    def _construct_col(self, src_cols: dict, srccol: str, projcoln:str, coltransform: str|None, table_name):
+        sdbtables = []
+        srccols = []
+        scol = src_cols.get(srccol)
+        if not scol:
+            raise AttributeError("Cannot locate column {} from {}".format(srccol, table_name))
+        else:
+            srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
+            sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
+            srcol_db = scol.source_table
+
+        column = Column(projcoln, scol.dtype)
+        column.srccol = srccols
+        column.tablename = sdbtables
+        column.column_expr = coltransform
+        column.source_table = srcol_db
+        return column
 
 class SQLAggregateTransform(SQLTransform):
     def __init__(self, source, projcols, groupcols):
@@ -160,22 +179,7 @@ class SQLAggregateTransform(SQLTransform):
             columns = collections.OrderedDict();
             for col in self._projcols_:
                 srccol, projcoln, coltransform = _get_proj_col_info(col)
-
-                sdbtables = []
-                srccols = []
-                scol = src_cols.get(srccol)
-                if not scol:
-                    raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
-                else:
-                    srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
-                    sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
-                    srcol_db = scol.source_table
-
-                column = Column(projcoln, scol.dtype)
-                column.srccol = srccols
-                column.tablename = sdbtables
-                column.transform = coltransform
-                column.source_table = srcol_db
+                column = self._construct_col(src_cols, srccol, projcoln, coltransform, str(source))
                 columns[projcoln] = column
             self._columns_ = columns
 
@@ -190,8 +194,8 @@ class SQLAggregateTransform(SQLTransform):
         projcoltxt = None
         for c in self.columns:  # Prepare the list of columns going into the select statement.
             col = self.columns[c]
-            projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + ((col.transform.columnExpr if (
-                col.transform) else col.srccol[0]) + ' AS ' + col.name)
+            projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + ((col.column_expr if (
+                col.column_expr) else col.srccol[0]) + ' AS ' + col.name)
 
         groupcoltxt = None
 
@@ -282,8 +286,8 @@ class SQLProjectionTransform(SQLTransform):
                 nonlocal colcount
                 colcount += 1
                 if isinstance(c, tuple):  # check if the projected column is given an alias name
-                    sc1 = c[0] # get the source column name / function
-                    pc1 = c[1]  # and the alias name for projection.
+                    sc1 = c[0] # get the projected column name / function
+                    pc1 = c[1]  # and the actual column
                 else:
                     sc1 = pc1 = c  # otherwise projected column name / function is the same as the source column.
                 # we only consider one possible source column as the renaming is one-one
@@ -293,7 +297,6 @@ class SQLProjectionTransform(SQLTransform):
                 projcol = pc1 if (isinstance(pc1, str)) else sc1
                 # coltransform = sc1 if (isinstance(sc1, F)) else None
                 # todo: what if the value to be assigned has more than 1 col here?
-
                 coltransform = pc1.column_expr if hasattr(pc1, 'column_expr') else None
                 return srccol, projcol, coltransform
 
@@ -304,29 +307,15 @@ class SQLProjectionTransform(SQLTransform):
             proj_cols = self._projcols_.items() if hasattr(self._projcols_, 'items') else self._projcols_
             for col in proj_cols:
                 srccol, projcoln, coltransform = _get_proj_col_info(col)
-
-                sdbtables = []
-                srccols = []
-                scol = src_cols.get(srccol)
-                if not scol:
-                    raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
-                else:
-                    srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
-                    sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
-                    srcol_db = scol.source_table
-
-                column = Column(projcoln, scol.dtype)
-                column.srccol = srccols
-                column.tablename = sdbtables
-                column.column_expr = coltransform
-                column.source_table = srcol_db
+                column = self._construct_col(src_cols, srccol, projcoln, coltransform, str(source))
                 columns[projcoln] = column
             self._columns_ = columns
 
     @property
     def columns(self):
         if not self._columns_:
-            self._gen_column(self._source_)
+            # the first source will be the main table
+            self._gen_column(self._source_[0]) if is_type(self._source_, ArrayLike) else self._gen_column(self._source_)
         return self._columns_
 
     @property
@@ -337,9 +326,18 @@ class SQLProjectionTransform(SQLTransform):
             projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + ((col.column_expr if (
                 col.column_expr) else col.srccol[0]) + ' AS ' + col.name);
 
+        # we need to append the selection part here
+        if is_type(self._source_, ArrayLike):
+            assert isinstance(self._source_[1].transform, SQLFilterTransform)
+            cond_text = ' '+self._source_[1].transform.gen_condition()
+            src_table = self._source_[0]
+        else:
+            cond_text = ''
+            src_table = self._source_
+
         sql_text = ('SELECT ' + projcoltxt + ' FROM '
-                    + '(' + self._source_.genSQL + ') ' + self._source_.table_name  # Source table transform SQL.
-                    )
+                    + '(' + src_table.genSQL + ') ' + src_table.table_name  # Source table transform SQL.
+                    + cond_text)
 
         return sql_text
 
@@ -395,7 +393,7 @@ class SQLJoinTransform(SQLTransform):
                     if tableName:
                         pc.tablename = tableName;
                     pc.srccol = [c.name];
-                    pc.transform = None;
+                    pc.column_expr = None;
                     projcolumns.append((proj_name, pc));
                     # projcolumns[projcol] = pc;
                 return projcolumns;
@@ -473,20 +471,7 @@ class SQLRenameTransform(SQLTransform):
             for col_ in self._modifiedcols_.keys():
                 col = {col_: self._modifiedcols_.get(col_)}
                 srccol, projcoln, coltransform = _get_proj_col_info(col)
-
-                sdbtables = []
-                srccols = []
-                scol = src_cols.get(srccol)
-                if not scol:
-                    raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
-                else:
-                    srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
-                    sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
-
-                column = Column(projcoln, scol.dtype)
-                column.srccol = srccols
-                column.tablename = sdbtables
-                column.transform = coltransform
+                column = self._construct_col(src_cols, srccol, projcoln, coltransform, str(source))
                 columns[projcoln] = column
             self._columns_ = columns
 
@@ -652,30 +637,12 @@ class SQLGroupByTransform(SQLTransform):
             src_cols = source.columns
 
             print("src cols:= ",src_cols)
-
             columns = collections.OrderedDict()
-
-
-
 
             for col in src_cols:
             # for col in self._groupcols_:
                 srccol, projcoln, coltransform = _get_proj_col_info(col)
-
-                sdbtables = []
-                srccols = []
-                scol = src_cols.get(srccol)
-                # print(f"scol is {scol}")
-                if not scol:
-                    raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
-                else:
-                    srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
-                    sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
-
-                column = Column(projcoln, scol.dtype)
-                column.srccol = srccols
-                column.tablename = sdbtables
-                column.transform = coltransform
+                column = self._construct_col(src_cols, srccol, projcoln, coltransform, str(source))
                 columns[projcoln] = column
             self._columns_ = columns
 
@@ -714,8 +681,8 @@ class SQLGroupByTransform(SQLTransform):
             if c in self._groupcols_:
                 col = self.columns[c]
 
-                projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + ((col.transform.genSQL if (
-                    col.transform) else col.srccol[0]) + ' AS ' + col.name)
+                projcoltxt = ((projcoltxt + ', ') if (projcoltxt) else '') + ((col.column_expr if (
+                    col.column_expr) else col.srccol[0]) + ' AS ' + col.name)
 
         groupcoltxt = None
         if self._groupcols_:
@@ -853,11 +820,29 @@ class SQLQuery(SQLTransform):
 
 
 class SQLFilterTransform(SQLTransform):
-    def __init__(self, source, op, other):
+    def __init__(self, source, op, other, combined=False):
         super().__init__(source)
-        self._op_ = op
+        self._op_ = self._reformat_op(op)
         self._other_ = other
-
+        self._combined = combined
+    
+    def _reformat_op(self, op):
+        if op == "eq":
+            op_formula= "="
+        elif op == "gt":
+            op_formula= ">"
+        elif op == "ne":
+            op_formula= "<>"
+        elif op == "ge":
+            op_formula= ">="
+        elif op == "le":
+            op_formula= "<="
+        elif op == "lt":
+            op_formula= "<"
+        else:
+            op_formula = op
+        return op_formula
+        
     @property
     def columns(self):
         if not self._columns_:
@@ -873,7 +858,13 @@ class SQLFilterTransform(SQLTransform):
     def is_float(self, o):
         return isinstance(o, float)
 
+    def is_date_time(self, o):
+        return isinstance(o, type(datetime.date))
+
     def is_same_type(self, o1, o2):
+        if self.is_date_time(o1):
+            return "date" in str(o2)
+
         if self.is_int(o1):
             return "int" in str(o2)
         if self.is_float(o1):
@@ -881,45 +872,106 @@ class SQLFilterTransform(SQLTransform):
         if self.is_string(o1):
             return "obj" in str(o2)
 
+    def _format_const(self, val):
+        if isinstance(val, str) or self.is_date_time(val):
+            return '\'{}\''.format(val)
+        elif hasattr(val, 'transform') and isinstance(val.transform, SQLFilterTransform):
+            return '('+val.transform.gen_clauses()+')'
+        elif is_type(val, ConstantTypes):
+            return str(val)
+        else:
+            raise ValueError('Filter on unsupported type {}'.format(type(val)))
+
+    def _combine_clauses(self):
+        if self._op_ == 'AND' or self._op_ == 'OR':
+            return self._format_const(self._source_) + ' {} '.format(self._op_) + self._format_const(self._other_)
+
+    def gen_clauses(self):
+        cmb = self._combine_clauses()
+        if cmb:
+            return cmb
+
+        src_cols = self._source_.columns
+        clauses = []
+        # compare with a single value
+        if is_type(self._other_, ConstantTypes):
+            for cname, col in src_cols.items():
+                if self.is_same_type(self._other_, col.dtype):
+                    cl = cname + ' ' + self._op_ + ' ' + self._format_const(self._other_)
+                    clauses.append(cl)
+                else:
+                    raise TypeError('Cannot compare {} with {}'.format(col.dtype, type(self._other_)))
+        # compare with a list of value
+        elif is_type(self._other_, ArrayLike):
+            for cname, const_val in zip(src_cols, self._other_):
+                col = src_cols[cname]
+                if self.is_same_type(const_val, col.dtype):
+                    cl = cname + ' ' + self._op_ + ' ' + self._format_const(const_val)
+                    clauses.append(cl)
+                else:
+                    raise TypeError('Cannot compare {} with {}'.format(col.dtype, type(const_val)))
+        else:
+            # compare with another column
+            if len(src_cols) != len(self._other_.columns) or len(self._other_.columns) != 1:
+                raise ValueError('The size of compared columns do not match')
+            else:
+                if len(src_cols) != len(self._other_.columns):
+                    other_cols = self._other_.columns.values() * len(src_cols)
+                else:
+                    other_cols = self._other_.columns.values()
+
+                for mcol, ocol in zip(src_cols.values(), other_cols):
+                    if self.is_same_type(mcol.dtype, ocol.dtype):
+                        cl = mcol.name + ' ' + self._op_ + ' ' + ocol.name
+                        clauses.append(cl)
+                    else:
+                        raise TypeError('Cannot compare {} with {}'.format(mcol.dtype, ocol.dtype))
+        return ' AND '.join(clauses)
+
+    def gen_condition(self):
+        where_clause = 'WHERE '+ self.gen_clauses()
+        return where_clause
+
     @property
     def genSQL(self):
         sqltext = "SELECT "
-
-        op_formula = []
-
-        if self._op_ == "eq":
-            op_formula.append("=")
-            op_formula.append("<>")
-
-        elif self._op_ == "gt":
-            op_formula.append(">")
-            op_formula.append("<>")
-
-        elif self._op_ == "ne":
-            op_formula.append("<>")
-            op_formula.append("=")
-
-        elif self._op_ == "ge":
-            op_formula.append(">=")
-            op_formula.append("<>")
-
-        elif self._op_ == "le":
-            op_formula.append("<=")
-            op_formula.append("<>")
-
-        elif self._op_ == "lt":
-            op_formula.append("<")
-            op_formula.append("<>")
+        #
+        # op_formula = []
+        #
+        # if self._op_ == "eq":
+        #     op_formula.append("=")
+        #     op_formula.append("<>")
+        #
+        # elif self._op_ == "gt":
+        #     op_formula.append(">")
+        #     op_formula.append("<>")
+        #
+        # elif self._op_ == "ne":
+        #     op_formula.append("<>")
+        #     op_formula.append("=")
+        #
+        # elif self._op_ == "ge":
+        #     op_formula.append(">=")
+        #     op_formula.append("<>")
+        #
+        # elif self._op_ == "le":
+        #     op_formula.append("<=")
+        #     op_formula.append("<>")
+        #
+        # elif self._op_ == "lt":
+        #     op_formula.append("<")
+        #     op_formula.append("<>")
 
         for c in self.columns:
             col = self.columns[c]
             col_type = col.dtype
+            print(" COLUMN DATETYPE IS : ", col_type)
             col_name = col.name
             if self.is_same_type(self._other_, col_type):
-                sqltext += "CASE WHEN " + col_name + " " + op_formula[0] + " " + str(
-                    self._other_) + " THEN TRUE ELSE FALSE END AS " + col_name + ", "
+                # print("dddddddd")
+                sqltext += "CASE WHEN " + col_name + " " + self._op_ + " " + self._format_const(self._other_) + " THEN TRUE ELSE FALSE END AS " + col_name + ", "
             else:
-                sqltext += "CASE WHEN" + " 1 " + op_formula[1] + " 1 THEN TRUE ELSE FALSE END AS " + col_name + ", "
+                sqltext += "CASE WHEN" + " 1 " + self._op_ + " 1 THEN TRUE ELSE FALSE END AS " + col_name + ", "
 
         sqltext = sqltext[:-2]
 
@@ -982,11 +1034,40 @@ class SQLQuery(SQLTransform):
 #     @property
 #     def genSQL(self):
 
+class SQLContainTransform(SQLTransform):
+    def __init__(self, source, condition, regex):
+        super().__init__(source)
+        self._condition_ = condition
+
+        self._regex_ = regex
+
+    @property
+    def columns(self):
+        # if isinstance(self.collist, dict):
+        #     pass
+        if not self._columns_:
+            self._columns_ = self._source_.columns
+        return self._columns_
+
+    @property
+    def genSQL(self):
+
+        prev_op = False
+        if isinstance(self._source_.transform, SQLProjectionTransform):
+            prev_op = True
+
+        sqltext = "SELECT * FROM " + self._source_.table_name + " WHERE "
+
+        if self._regex_:
+            sqltext += " LIKE " + "'" + self._condition_ + "'"
+
+
 class SQLApply(SQLTransform):
     def __init__(self, source, func, axis):
         super().__init__(source)
         self._func_ = func
         self._axis_ = axis
+
 
 class SQLAGG_Transform(SQLTransform):
 
@@ -1006,25 +1087,32 @@ class SQLAGG_Transform(SQLTransform):
             self._gen_column(self._source_)
         return self._columns_
 
-
     @property
     def table_name(self):
         if not self._table_name_:
             self._table_name_ = self._source_.table_name
         return self._table_name_
 
+    def _add_groupby_cols(self, source, columns, colcount):
+        if source.transform is not None and isinstance(source.transform, SQLGroupByTransform):
+            src_cols = source.columns
+            for by in source.transform._groupcols_:
+                srccol, projcoln, coltransform = by, by, None
+                column = self._construct_col(src_cols, srccol, projcoln, coltransform, str(source))
+                columns[projcoln] = column
+                colcount += 1
+            return columns, colcount
+
     def _gen_column(self, source):
 
-
         if not self._columns_:
-
             colcount = 0
 
             def _get_new_col(c, operation):
                 nonlocal colcount
                 colcount += 1
                 sc1 = c
-                pc1 = operation + "_" + c
+                pc1 = c
                 srccol = sc1
                 projcol = pc1 if (isinstance(pc1, str)) else (
                     sc1.columnExprAlias if (hasattr(sc1, 'columnExprAlias')) else 'col_'.format(colcount))
@@ -1042,7 +1130,8 @@ class SQLAGG_Transform(SQLTransform):
                 else:
                     sc1 = c  # otherwise projected column name / function is the same as the source column.
                 # we only consider one possible source column as the renaming is one-one
-                    pc1 = str(self.func) + "_" + c
+                    # keep the original name to be consistent with pandas
+                    pc1 = c
 
                 # todo: may need to extend this to use F class
                 srccol = sc1
@@ -1064,46 +1153,19 @@ class SQLAGG_Transform(SQLTransform):
 
                     for operation in operations:
                         srccol, projcoln, coltransform = _get_new_col(col, operation)
-
-
-
-                        sdbtables = []
-                        srccols = []
-                        scol = src_cols.get(srccol)
-                        # print(f"scol is {scol}")
-                        if not scol:
-                            raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
-                        else:
-                            srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
-                            sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
-
-                        column = Column(projcoln, scol.dtype)
-                        column.srccol = srccols
-                        column.tablename = sdbtables
-                        column.transform = coltransform
+                        if len(operations) > 1:
+                            projcoln = operation + '_' + projcoln
+                        column = self._construct_col(src_cols, srccol, projcoln, coltransform, str(source))
+                        column.agg_func = operation
                         columns[projcoln] = column
-
-
             else:
                 for col in self.collist:
                     srccol, projcoln, coltransform = _get_proj_col_info(col)
-
-                    sdbtables = []
-                    srccols = []
-                    scol = src_cols.get(srccol)
-                    # print(f"scol is {scol}")
-                    if not scol:
-                        raise AttributeError("Cannot locate column {} from {}".format(srccol, str(source)))
-                    else:
-                        srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
-                        sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
-
-                    column = Column(projcoln, scol.dtype)
-                    column.srccol = srccols
-                    column.tablename = sdbtables
-                    column.transform = coltransform
+                    column = self._construct_col(src_cols, srccol, projcoln, coltransform, str(source))
+                    column.agg_func = self.func
                     columns[projcoln] = column
 
+            columns, colcount = self._add_groupby_cols(source, columns, colcount)
             self._columns_ = columns
 
     @property
@@ -1127,16 +1189,18 @@ class SQLAGG_Transform(SQLTransform):
             for c in self.columns:
 
                 col = self.columns[c]
-                projcoltxt = (( projcoltxt + ", ") if (projcoltxt) else '') + (( self.func +'('+ col.transform.genSQL + ')' if (col.transform)
+                projcoltxt = (( projcoltxt + ", ") if (projcoltxt) else '') + (( self.func +'('+ col.column_expr + ')' if (col.column_expr)
                     else self.func +'('+col.srccol[0] + ')') + " AS " + col.name)
         else:
             for c in self.columns:
                 col = self.columns[c]
-                operations = [self.collist[col.srccol[0]]] if isinstance(self.collist[col.srccol[0]], str) else self.collist[col.srccol[0]]
-                for func in operations:
-                    if col.name == func + '_' + col.srccol[0]:
-                        projcoltxt = ((projcoltxt + ", ") if (projcoltxt) else '') + ((func + '(' + col.transform.genSQL + ')' if (col.transform)
-                        else func + '('+col.srccol[0] + ')') + " AS " + col.name)
+                if col.srccol[0] in self.collist:
+                    projcoltxt = ((projcoltxt + ", ") if (projcoltxt) else '') + ((col.agg_func + '(' + col.column_expr + ')' if (col.column_expr)
+                    else col.agg_func + '('+col.srccol[0] + ')') + " AS " + col.name)
+                else:
+                    # these are groupby columns
+                    projcoltxt = ((projcoltxt + ", ") if (projcoltxt) else '') \
+                                 + (col.column_expr if col.column_expr else col.srccol[0]) + " AS " + col.name
 
         if has_groupby:
 

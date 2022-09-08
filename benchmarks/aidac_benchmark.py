@@ -86,9 +86,9 @@ def q_01_v2():
 
 def q_03_v1():
     c = pd.read_remote_data('p1', 'customer')
-    o = pd.read_remote_data('p1', 'orders')
+    o = read_file('orders')
     l = pd.read_remote_data('p1', 'lineitem')
-    c = c.query('c_mktsegment == \'BUILDING\'')['c_custkey']
+    c = c[c['c_mktsegment'] == 'BUILDING']['c_custkey']
     o = o.query('o_orderdate < \'1995-3-15\'')
     o = o[['o_orderdate', 'o_shippriority', 'o_orderkey', 'o_custkey']]
     l = l.query('l_shipdate > \'1995, 3, 15\'')
@@ -98,7 +98,46 @@ def q_03_v1():
     t = c.merge(o, left_on='c_custkey', right_on='o_custkey', how='inner')
     t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey', how='inner')
     t = t[['l_orderkey', 'revenue', 'o_orderdate', 'o_shippriority']]
-    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority'), sort=False).agg({'revenue': 'sum'})
+    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority'), sort=False).agg('sum', {'revenue': 'sum'})
+    print(t.genSQL)
+    return t
+
+def q_10_v1():
+    o = read_file('orders')
+    o = o[['o_orderkey', 'o_orderpriority']]
+    l = pd.read_remote_data('p1', 'lineitem')
+    l = l.query('l_commitdate < l_receiptdate and l_receiptdate >= 1994-1-1')
+    l = l[['l_orderkey', 'l_shipmode']]
+
+    t = l.merge(o, left_on='l_orderkey', right_on='o_orderkey')
+    # def f(x):
+    #     if x == '1-URGENT' or x == '2-HIGH':
+    #         x1 = 1
+    #     else:
+    #         x1 = 0
+    #     if x != '1-URGENT' and x != '2-HIGH':
+    #         x2 = 1
+    #     else:
+    #         x2 = 0
+    #     return x1, x2
+    # t['high_line_count'], t['low_line_count'] = zip(*t['o_orderpriority'].apply(f))
+    # t = t[['l_shipmode', 'high_line_count', 'low_line_count']]
+    t = t.groupby('l_shipmode').sum()
+    t.sort_values('l_shipmode')
+    return t
+
+
+def q_13_v1():
+    c = pd.read_remote_data('p1', 'customer')
+    c = c[['c_custkey']]
+    o = pd.read_remote_data('p1', 'orders')
+    o = o.query('o_comment not like \'^.*special.*requests.*$\'')
+    o = o[['o_orderkey', 'o_custkey']]
+    t = c.merge(o, left_on='c_custkey', right_on='o_custkey', how='left')
+    t = t[['c_custkey', 'o_orderkey']]
+    t = t.groupby('c_custkey').count()
+    t = t.groupby('o_orderkey').count()
+    t.sort_values(['custdist', 'c_count'], ascending=[False, False])
     print(t.genSQL)
     return t
 
