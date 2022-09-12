@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import sys
+
 import pandas as pd
 import numpy as np
 
 import time
+
+from typing import Dict
 
 from aidac.common.DataIterator import generator
 from aidac.common.column import Column
@@ -36,7 +40,6 @@ def is_local(df1: frame.DataFrame, df2: frame.DataFrame):
                 if is_local(stub, df1):
                     return True
         return False
-
 
 def get_meta(df: frame.DataFrame):
     if df._data_ is not None:
@@ -358,6 +361,11 @@ class ScheduleExecutable(Executable):
             all_path.append(path)
         return self.find_local_transfer_costs(all_path)
 
+    def _convert_to_width(self, cols: Dict[str, Column]):
+        for cname, col in cols:
+            kclass = globals()[str(col.dtype)]()
+            sys.getsizeof(kclass)
+
     def find_local_transfer_costs(self, prev_dest=[]):
         """compute the transfer cost for all possible data transferring at the local level
         all_dest format:
@@ -393,8 +401,10 @@ class ScheduleExecutable(Executable):
                         new_cost = cost1 + cost2
                         all_plans.append((new_cost, new_path))
                     else:
+                        # currently does not support remote filter as the db does not have an order
+                        if not jn_flag:
+                            raise ValueError('Remote filtering is not supported')
                         # path separate as there are two possible destinations
-                        possible_path = (path1.val, path2.val)
                         new_path = Node(path1.val, [path1, path2])
                         # todo: write it in a better way
                         new_cost = cost1 + cost2 + self.prior_join_cost(self.prereqs[1], path1.val, path2.val, estimate_card)

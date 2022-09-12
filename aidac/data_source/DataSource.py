@@ -10,6 +10,9 @@ class DataSource:
         self.__cursor = None
         self.mapping = {}
 
+    def __str__(self):
+        return self.job_name
+
     def connect(self):
         pass
 

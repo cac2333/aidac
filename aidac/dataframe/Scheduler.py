@@ -63,7 +63,6 @@ class Scheduler:
                     else:
                         sblock = ScheduleExecutable(weakref.proxy(cur), ex1)
                         for s in sources:
-                            # todo: check if source in the same data source as current
                             sblock.add_prereq(_gen_pipe(s))
                         ex1.add_prereq(sblock)
             return ex1

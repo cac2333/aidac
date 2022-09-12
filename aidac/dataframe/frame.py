@@ -114,7 +114,6 @@ class DataFrame:
     @local_frame_wrapper
     def __getitem__(self, key):
         if isinstance(key, DataFrame):
-            # todo: selection
             if not isinstance(key.transform, SQLFilterTransform):
                 raise ValueError('The given dataframe must be a logical expression obtained from comparison')
             else:
