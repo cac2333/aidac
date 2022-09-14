@@ -7,5 +7,5 @@ setup(
    author='Suri Wang',
    author_email='suri980702@gmail.com',
    packages=['aidac'],  #same as name
-   install_requires=['wheel', 'numpy', 'pandas'], #external packages as dependencies
+   install_requires=['wheel', 'numpy', 'pandas', 'psycopg'], #external packages as dependencies
 )

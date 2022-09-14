@@ -743,6 +743,64 @@ class SQLFillNA(SQLTransform):
 
         return sqltext
 
+class SQLContainsTransform(SQLTransform):
+
+    def __init__(self, source, pat, case, regex):
+        super().__init__(source)
+        self._pattern_ = pat
+        self._case_ = case
+        self._regex_ = regex
+
+    @property
+    def columns(self):
+        if not self._columns_:
+            self._columns_ = self._source_.columns
+        return self._columns_
+
+    @property
+    def genSQL(self):
+        col = None
+        for c in self.columns:
+            col = self.columns[c]
+
+
+        is_all_alnum = True
+
+        for i in self._pattern_:
+            if not i.isalnum():
+                is_all_alnum = False
+
+        if self._regex_ and is_all_alnum:
+            self._pattern_ = '%' + self._pattern_ + '%'
+
+        # sqltext = 'SELECT * FROM ' + '(' + self._source_.genSQL + ') ' + self._source_.table_name + ' WHERE ' + col.name + ' '
+
+        if not self._case_:
+            sqltext = 'SELECT * FROM ' + '(' + self._source_.genSQL + ') ' + self._source_.table_name + ' WHERE ' + 'LOWER' + '(' + col.name + ')' + ' '
+            self._pattern_ = self._pattern_.lower()
+            if self._regex_:
+                sqltext += 'LIKE' + ' ' + "'" + self._pattern_ + "'"
+                return sqltext
+            else:
+                sqltext += 'LIKE' + ' ' + "'" + '%' + self._pattern_ + '%' + "'"
+                return sqltext
+
+        else:
+            sqltext = 'SELECT * FROM ' + '(' + self._source_.genSQL + ') ' + self._source_.table_name + ' WHERE ' + col.name + ' '
+            if self._regex_:
+                sqltext += 'LIKE' + ' ' + "'" + self._pattern_ + "'"
+                return sqltext
+            else:
+                sqltext += 'LIKE' + ' ' + "'" + '%' + self._pattern_ + '%' + "'"
+                return sqltext
+        # if self._regex_:
+        #     sqltext += 'LIKE' + ' ' + self._pattern_
+
+
+
+
+
+
 
 class SQLDropduplicateTransform(SQLTransform):
 
@@ -825,7 +883,7 @@ class SQLFilterTransform(SQLTransform):
         self._op_ = self._reformat_op(op)
         self._other_ = other
         self._combined = combined
-    
+
     def _reformat_op(self, op):
         if op == "eq":
             op_formula= "="
@@ -842,7 +900,7 @@ class SQLFilterTransform(SQLTransform):
         else:
             op_formula = op
         return op_formula
-        
+
     @property
     def columns(self):
         if not self._columns_:
@@ -859,7 +917,7 @@ class SQLFilterTransform(SQLTransform):
         return isinstance(o, float)
 
     def is_date_time(self, o):
-        return isinstance(o, type(datetime.date))
+        return isinstance(o, datetime.date)
 
     def is_same_type(self, o1, o2):
         if self.is_date_time(o1):
@@ -935,43 +993,23 @@ class SQLFilterTransform(SQLTransform):
     @property
     def genSQL(self):
         sqltext = "SELECT "
-        #
-        # op_formula = []
-        #
-        # if self._op_ == "eq":
-        #     op_formula.append("=")
-        #     op_formula.append("<>")
-        #
-        # elif self._op_ == "gt":
-        #     op_formula.append(">")
-        #     op_formula.append("<>")
-        #
-        # elif self._op_ == "ne":
-        #     op_formula.append("<>")
-        #     op_formula.append("=")
-        #
-        # elif self._op_ == "ge":
-        #     op_formula.append(">=")
-        #     op_formula.append("<>")
-        #
-        # elif self._op_ == "le":
-        #     op_formula.append("<=")
-        #     op_formula.append("<>")
-        #
-        # elif self._op_ == "lt":
-        #     op_formula.append("<")
-        #     op_formula.append("<>")
+
+        if self._op_ == "<>":  # ne
+            wrong_type_op = '='
+        else:
+            # all other cases should return false
+            wrong_type_op = '<>'
 
         for c in self.columns:
             col = self.columns[c]
             col_type = col.dtype
-            print(" COLUMN DATETYPE IS : ", col_type)
+            # print(" COLUMN DATETYPE IS : ", col_type)
             col_name = col.name
             if self.is_same_type(self._other_, col_type):
                 # print("dddddddd")
                 sqltext += "CASE WHEN " + col_name + " " + self._op_ + " " + self._format_const(self._other_) + " THEN TRUE ELSE FALSE END AS " + col_name + ", "
             else:
-                sqltext += "CASE WHEN" + " 1 " + self._op_ + " 1 THEN TRUE ELSE FALSE END AS " + col_name + ", "
+                sqltext += "CASE WHEN" + " 1 " + wrong_type_op + " 1 THEN TRUE ELSE FALSE END AS " + col_name + ", "
 
         sqltext = sqltext[:-2]
 
@@ -1062,6 +1100,8 @@ class SQLContainTransform(SQLTransform):
             sqltext += " LIKE " + "'" + self._condition_ + "'"
 
 
+
+
 class SQLApply(SQLTransform):
     def __init__(self, source, func, axis):
         super().__init__(source)
@@ -1149,6 +1189,7 @@ class SQLAGG_Transform(SQLTransform):
             # print(isinstance(self.collist, dict))
             if self._is_dict_:
                 for col in self.collist:
+                    # get all the operations for one column
                     operations = [self.collist[col]] if isinstance(self.collist[col], str) else self.collist[col]
 
                     for operation in operations:
@@ -1194,7 +1235,7 @@ class SQLAGG_Transform(SQLTransform):
         else:
             for c in self.columns:
                 col = self.columns[c]
-                if col.srccol[0] in self.collist:
+                if col.srccol[0] in self.collist and col.agg_func is not None:
                     projcoltxt = ((projcoltxt + ", ") if (projcoltxt) else '') + ((col.agg_func + '(' + col.column_expr + ')' if (col.column_expr)
                     else col.agg_func + '('+col.srccol[0] + ')') + " AS " + col.name)
                 else:

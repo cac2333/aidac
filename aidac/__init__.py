@@ -17,8 +17,8 @@ def tables():
     manager.tables()
 
 
-def read_csv(path, delimiter=',', header='infer', names=None):
-    return frame.read_csv(path, delimiter, header, names)
+def read_csv(path, delimiter=',', header='infer', names=None, parse_dates=True):
+    return frame.read_csv(path, delimiter, header, names, parse_dates=parse_dates)
 
 
 def from_dict(data):

@@ -16,8 +16,8 @@ def connect(host, dbname, schema, port, user, pwd):
     aidac.add_data_source('postgres', host, user, pwd, dbname, 'p1', port)
 
 
-def read_file(table):
-    return pd.read_csv(_PATH+table+'.csv')
+def read_file(table, parse_dates=False):
+    return pd.read_csv(_PATH+table+'.csv', parse_dates=parse_dates)
 
 class My_UDF_Class:
     def my_func(self, a, b):
@@ -84,9 +84,32 @@ def q_01_v2():
     t = o.merge(l, left_on='o_orderkey', right_on='l_orderkey')[['l_orderkey', 'o_orderdate', 'o_shippriority']]
     return t
 
+def q_02_v1():
+    p = pd.read_remote_data('p1', 'part')
+    p = p[(p['p_size'] == 15) & (p['p_type'].str.contains('^.*BRASS$'))]
+    p = p[['p_partkey', 'p_mfgr']]
+    ps = pd.read_remote_data('p1', 'partsupp')
+    ps = ps[['ps_suppkey', 'ps_supplycost', 'ps_partkey']]
+    s = read_file('supplier')
+    s = s[['s_nationkey', 's_suppkey', 's_acctbal', 's_name', 's_address', 's_phone', 's_comment']]
+    n = pd.read_remote_data('p1', 'nation')
+    n = n[['n_nationkey', 'n_regionkey', 'n_name']]
+    r = read_file('region')
+    r = r[r['r_name'] == 'EUROPE']
+    r = r[['r_regionkey']]
+
+    j = ps.merge(s, left_on='ps_suppkey', right_on='s_suppkey')
+    j = j.merge(n, left_on='s_nationkey', right_on='n_nationkey')
+    j = j.merge(r, left_on='n_regionkey', right_on='r_regionkey')
+
+    ti = j[['ps_partkey', 'ps_supplycost']].groupby('ps_partkey').min()
+    print(ti.genSQL)
+    return ti
+
+
 def q_03_v1():
     c = pd.read_remote_data('p1', 'customer')
-    o = read_file('orders')
+    o = read_file('orders', parse_dates=[4])
     l = pd.read_remote_data('p1', 'lineitem')
     c = c[c['c_mktsegment'] == 'BUILDING']['c_custkey']
     o = o.query('o_orderdate < \'1995-3-15\'')
@@ -98,34 +121,44 @@ def q_03_v1():
     t = c.merge(o, left_on='c_custkey', right_on='o_custkey', how='inner')
     t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey', how='inner')
     t = t[['l_orderkey', 'revenue', 'o_orderdate', 'o_shippriority']]
-    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority'), sort=False).agg('sum', {'revenue': 'sum'})
+    t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority'), sort=False).agg({'revenue': 'sum'})
     print(t.genSQL)
     return t
 
-def q_10_v1():
-    o = read_file('orders')
-    o = o[['o_orderkey', 'o_orderpriority']]
+def q_04_v1():
     l = pd.read_remote_data('p1', 'lineitem')
-    l = l.query('l_commitdate < l_receiptdate and l_receiptdate >= 1994-1-1')
-    l = l[['l_orderkey', 'l_shipmode']]
+    l = l[l['l_commitdate'] < l['l_receiptdate']]
+    o = read_file('orders')
+    o = o[(o['o_orderdate'] >= datetime.date(1993, 7, 1))
+          &(o['o_orderdate'] < datetime.date(1993, 10, 1))]
+    o = o[['o_orderpriority', 'o_orderkey']]
 
-    t = l.merge(o, left_on='l_orderkey', right_on='o_orderkey')
-    # def f(x):
-    #     if x == '1-URGENT' or x == '2-HIGH':
-    #         x1 = 1
-    #     else:
-    #         x1 = 0
-    #     if x != '1-URGENT' and x != '2-HIGH':
-    #         x2 = 1
-    #     else:
-    #         x2 = 0
-    #     return x1, x2
-    # t['high_line_count'], t['low_line_count'] = zip(*t['o_orderpriority'].apply(f))
-    # t = t[['l_shipmode', 'high_line_count', 'low_line_count']]
-    t = t.groupby('l_shipmode').sum()
-    t.sort_values('l_shipmode')
+    t = o.groupby('o_orderpriority').count()
+    t.sort_values('o_orderpriority')
     return t
 
+def q_10_v1():
+    c = pd.read_remote_data('p1', 'customer')
+    c = c[['c_custkey', 'c_nationkey', 'c_name', 'c_acctbal', 'c_address', 'c_phone', 'c_comment']]
+    o = pd.read_remote_data('p1', 'orders')
+    o = o[(o['o_orderdate'] >= datetime.date(1993, 10, 1))
+         &(o['o_orderdate'] < datetime.date(1994, 1, 1))]
+    o = o[['o_orderkey', 'o_custkey']]
+    l = pd.read_remote_data('p1', 'lineitem')
+    l = l[l['l_returnflag'] == 'R']
+    l['revenue'] = l['l_extendedprice'] * (1 - l['l_discount'])
+    l = l[['l_orderkey', 'revenue']]
+    n = pd.read_remote_data('p1', 'nation')
+    n = n[['n_name', 'n_nationkey']]
+
+    t = c.merge(o, left_on='c_custkey', right_on='o_custkey')
+    t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey')
+    t = t.merge(n, left_on='c_nationkey', right_on='n_nationkey')
+    t = t[['c_custkey', 'c_name', 'c_acctbal', 'c_phone', 'n_name', 'c_address', 'c_comment', 'revenue']]
+    t = t.groupby(('c_custkey', 'c_name', 'c_acctbal', 'c_phone', 'n_name', 'c_address', 'c_comment')).agg({'revenue': 'sum'})
+    t.sort_values('revenue', ascending=False)
+    print(t.genSQL)
+    return t
 
 def q_13_v1():
     c = pd.read_remote_data('p1', 'customer')
@@ -145,12 +178,12 @@ def measure_time(func, *args):
     start = time.time()
     rs = func(*args)
     rs.materialize()
-    print(rs.data)
     end = time.time()
+    print(rs.data)
     print('Function {} takes time {}'.format(func, end-start))
 
 
 if __name__ == '__main__':
     connect('127.0.0.1', 'sf01', 'sf01', 5432, 'postgres', 'postgres')
-    measure_time(q_03_v1)
+    measure_time(q_10_v1)
     # udf_func()

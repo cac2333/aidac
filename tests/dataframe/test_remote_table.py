@@ -1,10 +1,11 @@
-import datetime
 import unittest
 import re
 
 import aidac
 
 from aidac.dataframe.transforms import *
+
+import datetime
 
 
 class MyTestCase(unittest.TestCase):
@@ -51,9 +52,8 @@ class MyTestCase(unittest.TestCase):
         ad = self.midwife_['prac_id'] + 1
         mul = self.midwife_['prac_id'] * ad
         sql = mul.genSQL
-        self.assertEqual(sql,
-                    'SELECT ((1+prac_id)*prac_id) AS prac_id FROM (SELECT prac_id AS prac_id FROM'
-                    ' (SELECT * FROM midwife) midwife) SQLProjectionTransform9')
+        self.assertRegex(sql, r'SELECT \(\(1\+prac_id\)\*prac_id\) AS prac_id FROM \(SELECT prac_id AS prac_id FROM'
+                    ' \(SELECT \* FROM midwife\) midwife\) SQLProjectionTransform\d')
 
     def test_set_item1(self):
         self.midwife_['new_id'] = (self.midwife_['prac_id'] + 1 ) * self.midwife_['prac_id']
@@ -88,7 +88,7 @@ class MyTestCase(unittest.TestCase):
         print(dd)
 
     def test_order_by(self):
-        order_ = self.coup_.order("sid")
+        order_ = self.coup_.sort_values("sid")
         self.assertTrue(isinstance(order_.transform, SQLOrderTransform))
         sql = order_.transform.genSQL
         self.assertEqual(sql, 'SELECT * FROM couple ORDER BY sid asc')
@@ -122,7 +122,6 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(sql, 'SELECT DISTINCT couple_id, hcardid, sid FROM (SELECT * FROM couple) couple')
 
     def test_drop_na(self):
-
         dn = self.coup_.dropna()
         self.assertTrue(isinstance(dn.transform, SQLDropNA))
         sql = dn.transform.genSQL
@@ -195,7 +194,6 @@ class MyTestCase(unittest.TestCase):
                               "TRUE ELSE FALSE END AS phone, CASE WHEN iid >= 6 THEN TRUE ELSE FA"
                               "LSE END AS iid FROM (SELECT * FROM midwife) midwife")
 
-
     def test_le(self):
         le = self.midwife_ <= 6
         self.assertTrue(isinstance(le.transform, SQLFilterTransform))
@@ -222,8 +220,7 @@ class MyTestCase(unittest.TestCase):
                               "TRUE ELSE FALSE END AS phone, CASE WHEN iid < 6 THEN TRUE ELSE FA"
                               "LSE END AS iid FROM (SELECT * FROM midwife) midwife")
 
-
-    def test_g_aroupgg(self):
+    def test_group_agg(self):
         gag = self.midwife_.groupby("iid").agg(func="count")
         # p = gag.columns
 
@@ -234,16 +231,18 @@ class MyTestCase(unittest.TestCase):
                               "BY iid")
         #
         gag2 = self.midwife_.groupby("iid").agg(collist=
-                                                {"prac_id":["count", "max"],
-                                                 "email":"count"})
+                                                {"prac_id": ["count", "max"],
+                                                 "email": "count",
+                                                 "iid": ["count", "avg"]})
         sql2 = gag2.transform.genSQL
         self.assertEqual(sql2,"SELECT count(prac_id) AS count_prac_id, max(prac_id) AS max_prac_id,"
-                              " count(email) AS email, iid AS iid FROM (SELECT * FROM midwife)midwife GROUP BY iid ORDER BY iid")
+                              " count(email) AS email, count(iid) AS count_iid, avg(iid) AS avg_iid, "
+                              "iid AS iid FROM (SELECT * FROM midwife)midwife GROUP BY iid ORDER BY iid")
 
         gag2 = self.midwife_.groupby("iid").agg(collist=
                                                 {"prac_id": ["count", "max"],
                                                  "email": "count",
-                                                 "iid": ["count", "avg"]})
+                       "iid": ["count", "avg"]})
 
     def test_contains(self):
 
@@ -267,5 +266,45 @@ class MyTestCase(unittest.TestCase):
                               "CASE WHEN 1 <> 1 THEN TRUE ELSE FALSE END AS language, CASE WHEN"
                               " 1 <> 1 THEN TRUE ELSE FALSE END AS prac_id FROM (SELECT * FROM "
                               "info_session) info_session")
+
+    def test_yrs(self):
+        is_ = self.info_session_ > datetime.date(1999, 1, 1).year
+        sql = is_.genSQL
+        self.assertEqual(sql, "") # should be error
+
+    def test_contains_2(self):
+
+        mw = self.midwife_
+        mw_series = mw["email"].str
+
+        mw_sql = mw_series.genSQL
+
+        self.assertEqual(mw_sql, "SELECT email AS email FROM (SELECT * FROM midwife) midwife")
+
+        mw_contains_1 = mw_series.contains("w", regex=True, case=True)
+        mw_contains_2 = mw_series.contains("WFW", regex=True, case=False)
+        mw_contains_3 = mw_series.contains("WW", regex = False, case = True)
+        mw_contains_4 = mw_series.contains("eWFW", regex=False, case=False)
+
+        mw_sql1 = mw_contains_1.genSQL
+        mw_sql2 = mw_contains_2.genSQL
+        mw_sql3 = mw_contains_3.genSQL
+        mw_sql4 = mw_contains_4.genSQL
+
+        self.assertEqual(mw_sql1, "SELECT * FROM (SELECT email AS email FROM (SELECT * FROM midwife"
+                                  ") midwife) SQLProjectionTransform8 WHERE email LIKE '%w%'")
+
+        self.assertEqual(mw_sql2, "SELECT * FROM (SELECT email AS email FROM (SELECT * FROM midwife"
+                                  ") midwife) SQLProjectionTransform8 WHERE LOWER(email) LIKE '%wfw"
+                                  "%'")
+
+        self.assertEqual(mw_sql3, "SELECT * FROM (SELECT email AS email FROM (SELECT * FROM midwife"
+                                  ") midwife) SQLProjectionTransform8 WHERE email LIKE '%WW%'")
+
+        self.assertEqual(mw_sql4, "SELECT * FROM (SELECT email AS email FROM (SELECT * FROM midwife"
+                                  ") midwife) SQLProjectionTransform8 WHERE LOWER(email) LIKE '%ewfw%'")
+
+
+
 if __name__ == '__main__':
     unittest.main()

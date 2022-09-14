@@ -27,9 +27,17 @@ class Database:
         return t
 
 
-def read_file(table):
-    return pd.read_csv(''+_PATH+table+'.csv')
+def read_file(table, parse_dates=False):
+    return pd.read_csv(''+_PATH+table+'.csv', parse_dates=parse_dates)
 
+
+def read_tables(local_tbs, remote_tbs):
+    all_tbs = {}
+    for p in local_tbs:
+        all_tbs[p] = read_file(p)
+    for p in remote_tbs:
+        all_tbs[p] = my_db.get_table(p)
+    return all_tbs
 
 def my_query_01():
     """
@@ -116,6 +124,32 @@ def q_03_v1():
     t = t[['l_orderkey', 'l_extendedprice', 'o_orderdate', 'o_shippriority']]
     t = t.groupby(('l_orderkey', 'o_orderdate', 'o_shippriority')).agg('sum')
 
+    return t
+
+
+def q_10_v1(locals, remotes):
+    tbs = read_tables(locals, remotes)
+
+    c = tbs['customer']
+    c = c[['c_custkey', 'c_nationkey', 'c_name', 'c_acctbal', 'c_address', 'c_phone', 'c_comment']]
+    o = tbs['orders']
+    o = o[(o['o_orderdate'] >= datetime.date(1993, 10, 1))
+         &(o['o_orderdate'] < datetime.date(1994, 1, 1))]
+    o = o[['o_orderkey', 'o_custkey']]
+    l = tbs['lineitem']
+    l = l[l['l_returnflag'] == 'R']
+    l['revenue'] = l['l_extendedprice'] * (1 - l['l_discount'])
+    l = l[['l_orderkey', 'revenue']]
+    n = tbs['nation']
+    n = n[['n_name', 'n_nationkey']]
+
+    t = c.merge(o, left_on='c_custkey', right_on='o_custkey')
+    t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey')
+    t = t.merge(n, left_on='c_nationkey', right_on='n_nationkey')
+    t = t[['c_custkey', 'c_name', 'c_acctbal', 'c_phone', 'n_name', 'c_address', 'c_comment', 'revenue']]
+    t = t.groupby(('c_custkey', 'c_name', 'c_acctbal', 'c_phone', 'n_name', 'c_address', 'c_comment')).agg('sum', {'revenue': 'sum'})
+    t.sort_values('revenue', ascending=False)
+    print(t.genSQL)
     return t
 
 def measure_time(func, *args):

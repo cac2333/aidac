@@ -11,6 +11,8 @@ import numpy as np
 from typing import Union, List, Dict
 
 from aidac.common.aidac_types import *
+from _distutils_hack import override
+
 from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource, local_ds
 from aidac.dataframe.transforms import *
@@ -31,8 +33,8 @@ def local_frame_wrapper(func):
     def inner(self, *args, **kwargs):
         func_name = func.__name__
         if self.data is not None:
-            pd_func = getattr(pd.DataFrame, func_name)
-            pdf = pd_func(self.data, *args, **kwargs)
+            pd_func = getattr(self.data, func_name)
+            pdf = pd_func(*args, **kwargs)
             return DataFrame(pdf, ds=local_ds)
         else:
             df = func(self, *args, **kwargs)
@@ -48,10 +50,11 @@ def binary_op_local_frame_wrapper(func):
     def inner(self, other):
         func_name = func.__name__
         if self.data is not None:
-            if is_type(other, ConstantTypes) or (is_type(other, DataFrame) and other.data is not None):
-                pd_func = getattr(self.data, func_name)
-                pdf = pd_func(other)
-                return DataFrame(pdf, ds=local_ds)
+            if is_type(other, DataFrame) and other.data is not None:
+                other = other.data
+            pd_func = getattr(self.data, func_name)
+            pdf = pd_func(other)
+            return DataFrame(pdf, ds=local_ds)
         df = func(self, other)
         df.source_table = self.source_table
         df._saved_func_name_ = func_name
@@ -78,10 +81,39 @@ class DataFrame:
         self._saved_kwargs_ = {}
         self._db_persistent = db_persistent
 
+        # self.str = None     #return DF
+        '''
+        check type of the column
+        
+        '''
+
+    @property
+    def str(self):
+        columns = self.columns
+        is_str = True
+        col_type = None
+        for c in columns:
+            col = columns[c]
+            if col.dtype == object:
+                break
+            else:
+                col_type = col.dtype
+                is_str = False
+        if not is_str:
+            raise ValueError(f"cannot set type {col_type} as str!")
+        if len(columns) == 1:
+            return self
+        raise ValueError(f"operation only supports Series with number of columns = 1!")
+
+    @local_frame_wrapper
+    def contains(self, pat: str, case = True, regex = True):
+
+        transform = SQLContainsTransform(self, pat, case, regex)
+        return DataFrame(ds=self.data_source, transform=transform)
+
     """
     override so that any unsupported function call directly goes to pandas 
     """
-
     # def __getattr__(self, item):
     #     def dataframe_wrapper(*args, **kwargs):
     #         func_name = item
@@ -111,7 +143,7 @@ class DataFrame:
         tb = DataFrame(transform=trans, ds=self.data_source)
         return tb
 
-    @local_frame_wrapper
+    @binary_op_local_frame_wrapper
     def __getitem__(self, key):
         if isinstance(key, DataFrame):
             if not isinstance(key.transform, SQLFilterTransform):
@@ -283,10 +315,11 @@ class DataFrame:
         return DataFrame(ds=self.data_source, transform=transform)
 
     @local_frame_wrapper
-    def agg(self, func = None, collist: Union[None, List[str], Dict] = None):
-        if not collist:
-            collist = []
-
+    def agg(self, collist: Union[None, List[str], Dict, str] = None):
+        if isinstance(collist, str):
+            func = collist
+        else:
+            func = None
         trans = SQLAGG_Transform(self, func=func, collist=collist)
         return DataFrame(ds=self.data_source, transform=trans)
 
@@ -320,8 +353,24 @@ class DataFrame:
 
         return DataFrame(ds=self.data_source, transform=transform)
 
+    @local_frame_wrapper
     def count(self):
         trans = SQLAGG_Transform(self, func='count', collist=self.columns.keys())
+        return DataFrame(ds=self.data_source, transform=trans)
+
+    @local_frame_wrapper
+    def sum(self):
+        trans = SQLAGG_Transform(self, func='sum', collist=self.columns.keys())
+        return DataFrame(ds=self.data_source, transform=trans)
+
+    @local_frame_wrapper
+    def min(self):
+        trans = SQLAGG_Transform(self, func='min', collist=self.columns.keys())
+        return DataFrame(ds=self.data_source, transform=trans)
+
+    @local_frame_wrapper
+    def max(self):
+        trans = SQLAGG_Transform(self, func='max', collist=self.columns.keys())
         return DataFrame(ds=self.data_source, transform=trans)
 
     def to_dict(self, orient, into):
@@ -415,25 +464,25 @@ class DataFrame:
 
     @local_frame_wrapper
     def __lt__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
+        if is_type(other, ConstantTypes):
             trans = SQLFilterTransform(self, "lt", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __le__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
+        if is_type(other, ConstantTypes):
             trans = SQLFilterTransform(self, "le", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
-    @local_frame_wrapper
+    @binary_op_local_frame_wrapper
     def __and__(self, other):
         if isinstance(other, DataFrame) and isinstance(other.transform, SQLFilterTransform):
             trans = SQLFilterTransform(self, 'AND', other)
             return DataFrame(ds=self.data_source, transform=trans)
 
-    @local_frame_wrapper
+    @binary_op_local_frame_wrapper
     def __or__(self, other):
         if isinstance(other, DataFrame) and isinstance(other.transform, SQLFilterTransform):
             trans = SQLFilterTransform(self, 'OR', other)
@@ -453,10 +502,6 @@ class DataFrame:
         return self._data_.to_csv(path_or_buf, sep, na_rep, float_format, columns, header, index, index_label, mode,
                                   encoding, compression, quoting, quotechar, line_terminator, chunksize, date_format,
                             doublequote, escapechar, decimal, errors, storage_options)
-
-    def contains(self, condition, regex = True):
-        trans = SQLContainTransform(self, condition, regex)
-        return DataFrame(self.data_source, transform=trans)
 
     @classmethod
     def read_pickle(cls, filepath_or_buffer, compression, dict__, storage_options):

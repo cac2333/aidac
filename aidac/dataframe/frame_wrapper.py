@@ -24,6 +24,8 @@ class WFrame:
         self._tail_frame = df
 
     def __getitem__(self, key):
+        if isinstance(key, WFrame):
+            key = key._tail_frame
         return WFrame(self._tail_frame[key])
 
     def __setitem__(self, key, value):
@@ -83,6 +85,10 @@ class WFrame:
     def transform(self):
         return self._tail_frame.transform
 
+    @property
+    def str(self):
+        return self._tail_frame.str
+
     def __repr__(self) -> str:
         """
         @return: string representation of current dataframe
@@ -114,8 +120,11 @@ class WFrame:
     def aggregate(self, projcols, groupcols=None):
         return WFrame(self._tail_frame.aggregate(projcols, groupcols))
 
-    def agg(self, func=None, collist=None):
-        return WFrame(self._tail_frame.agg(func, collist))
+    def agg(self, collist=None):
+        return WFrame(self._tail_frame.agg(collist))
+
+    def contains(self, pat: str, case=True, regex=True):
+        return WFrame(self._tail_frame.contains(pat, case, regex))
 
     def head(self, n=5):
         return WFrame(self._tail_frame.head(n))
@@ -130,8 +139,20 @@ class WFrame:
     def groupby(self, by: Union[List[str], str], sort=True, axis=0):
         return WFrame(self._tail_frame.groupby(by, sort, axis))
 
+    def sort_values(self,  orderlist: Union[List[str], str], ascending=True):
+        return WFrame(self._tail_frame.sort_values(orderlist, ascending))
+
     def count(self):
         return WFrame(self._tail_frame.count())
+
+    def sum(self):
+        return WFrame(self._tail_frame.sum())
+
+    def min(self):
+        return WFrame(self._tail_frame.min())
+
+    def max(self):
+        return WFrame(self._tail_frame.max())
 
     def to_dict(self, orient, into):
         return self._tail_frame.to_dict(orient, into)
@@ -233,8 +254,9 @@ class WFrame:
         return WFrame(DataFrame(pd.read_orc(columns, **kwargs)))
 
 
-def read_csv(path, delimiter, header, names) -> DataFrame:
-    df = pd.read_csv(path, delimiter=delimiter, header=header, names=names)
+def read_csv(path, delimiter, header, names, parse_dates=False) -> DataFrame:
+    df = pd.read_csv(path, delimiter=delimiter, header=header, names=names, parse_dates=parse_dates)
+    cols = df.columns
     return WFrame(DataFrame(data=df, ds=local_ds))
 
 

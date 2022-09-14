@@ -10,7 +10,6 @@ from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource
 from aidac.data_source.QueryLoader import QueryLoader
 import psycopg
-from psycopg2.extensions import register_adapter, AsIs
 
 from aidac.data_source.ResultSet import ResultSet
 
@@ -19,12 +18,10 @@ from aidac.data_source.ResultSet import ResultSet
 DS = 'postgres'
 ql = QueryLoader(DS)
 
-register_adapter(np.int32, AsIs)
-register_adapter(np.int64, AsIs)
 
 typeConverter = { np.int8: 'TINYINT', np.int16: 'SMALLINT', np.int32: 'INT', np.int64: 'NUMERIC'
     , np.float32: 'FLOAT', np.float64: 'FLOAT', np.object: 'VARCHAR(100)', np.object_: 'VARCHAR(100)', bytearray: 'BLOB'
-    , 'date': 'DATE', 'time': 'TIME', 'timestamp': 'TIMESTAMP', "datetime": datetime.date};
+    , datetime.date: 'DATE', datetime.time: 'TIME', 'timestamp': 'TIMESTAMP', np.datetime64: 'TIMESTAMP'};
 
 typeConverter_rev = {'integer': np.int32, 'character varying': np.object, 'double precision': np.float64,
                      'numeric': np.float, 'character': np.object,
@@ -95,6 +92,7 @@ class PostgreDataSource(DataSource):
         col_def = ', '.join(col_def)
 
         qry = ql.create_table(table_name, col_def)
+        print('------------create tb-----------\n{}'.format(qry))
         self._execute(qry)
         return col_def
 

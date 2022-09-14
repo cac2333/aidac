@@ -2,7 +2,7 @@ import collections
 from collections.abc import Iterable
 
 import numpy as np
-from convert import convert
+
 
 class ResultSet:
     def __init__(self, cols: Iterable, data: Iterable):
@@ -40,7 +40,6 @@ class ResultSet:
         return rs
 
     def get_result_table(self):
-
         od = collections.OrderedDict()
 
         def _gen_type(data, row, col):
@@ -55,9 +54,12 @@ class ResultSet:
 
             return tp
 
+        if not self.data:
+            return od
+
         for idx1, col in enumerate(self.columns):
             # tp = type(self.data[0][idx1])
-            tp = _gen_type(self.data, 0, idx1)
+            tp = type(self.data[0][idx1])
             if tp == str:
                 tp = object  #
 
@@ -69,13 +71,6 @@ class ResultSet:
                     # print(f'column: {col}, row_value={row[idx1]}')
                     pass
         return od
-# from convert import convert
-# try:
-#     dummy = [{'col1': 2}, {'col1': 'None'}]
-#     cv = convert(dummy, ['col1'], 2, 1)
-# except Exception as e:
-#     print(e)
-# print('cv: '+str(cv))
 
     def to_pd(self):
         """
@@ -92,4 +87,3 @@ class ResultSet:
         """
         for idx1, col in enumerate(self.columns):
             tp = type(self.data[0][idx1])
-
