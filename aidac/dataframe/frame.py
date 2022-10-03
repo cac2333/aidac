@@ -25,15 +25,16 @@ import aidac.dataframe.Scheduler as Scheduler
 sc = Scheduler.Scheduler()
 
 
-def create_remote_table(source, table_name):
-    return DataFrame(ds=source, table_name=table_name)
-
+STR_FUNCS = {'contains'}
 
 def local_frame_wrapper(func):
     def inner(self, *args, **kwargs):
         func_name = func.__name__
         if self.data is not None:
-            pd_func = getattr(self.data, func_name)
+            if isinstance(self.data, pd.Series) and func_name in STR_FUNCS:
+                pd_func = getattr(self.data.str, func_name)
+            else:
+                pd_func = getattr(self.data, func_name)
             pdf = pd_func(*args, **kwargs)
             return DataFrame(pdf, ds=local_ds)
         else:
@@ -50,11 +51,18 @@ def binary_op_local_frame_wrapper(func):
     def inner(self, other):
         func_name = func.__name__
         if self.data is not None:
-            if is_type(other, DataFrame) and other.data is not None:
-                other = other.data
-            pd_func = getattr(self.data, func_name)
-            pdf = pd_func(other)
-            return DataFrame(pdf, ds=local_ds)
+            if (is_type(other, DataFrame) and other.data is not None) :
+            # # todo: check other ds
+            # other.materialize()
+            # other = other.data
+                pd_func = getattr(self.data, func_name)
+                pdf = pd_func(other.data)
+                return DataFrame(pdf, ds=local_ds)
+            elif not is_type(other, DataFrame):
+                pd_func = getattr(self.data, func_name)
+                pdf = pd_func(other)
+                return DataFrame(pdf, ds=local_ds)
+
         df = func(self, other)
         df.source_table = self.source_table
         df._saved_func_name_ = func_name
@@ -92,13 +100,7 @@ class DataFrame:
         columns = self.columns
         is_str = True
         col_type = None
-        for c in columns:
-            col = columns[c]
-            if col.dtype == object:
-                break
-            else:
-                col_type = col.dtype
-                is_str = False
+
         if not is_str:
             raise ValueError(f"cannot set type {col_type} as str!")
         if len(columns) == 1:
@@ -107,9 +109,12 @@ class DataFrame:
 
     @local_frame_wrapper
     def contains(self, pat: str, case = True, regex = True):
-
         transform = SQLContainsTransform(self, pat, case, regex)
         return DataFrame(ds=self.data_source, transform=transform)
+
+    @local_frame_wrapper
+    def reset_index(self, inplace=True):
+        return self
 
     """
     override so that any unsupported function call directly goes to pandas 
@@ -146,7 +151,7 @@ class DataFrame:
     @binary_op_local_frame_wrapper
     def __getitem__(self, key):
         if isinstance(key, DataFrame):
-            if not isinstance(key.transform, SQLFilterTransform):
+            if not (isinstance(key.transform, SQLFilterTransform) or isinstance(key.transform, SQLContainsTransform)):
                 raise ValueError('The given dataframe must be a logical expression obtained from comparison')
             else:
                 if self.source_table != key.source_table:
@@ -220,7 +225,9 @@ class DataFrame:
             if self.data is not None:
                 cols = {}
                 # create columns using pandas index column name and types
-                for cname, ctype in zip(self._data_.dtypes.index, self._data_.dtypes):
+                col_idx_name = self.data.columns if hasattr(self.data, 'columns') else [self.data.name]
+                col_idx_type = self._data_.dtypes if hasattr(self.data, 'columns') else [self._data_.dtypes]
+                for cname, ctype in zip(col_idx_name, col_idx_type):
                     if isinstance(ctype, np.dtype):
                         ctype = ctype.type
                     cols[cname] = Column(cname, ctype)
@@ -323,6 +330,10 @@ class DataFrame:
         trans = SQLAGG_Transform(self, func=func, collist=collist)
         return DataFrame(ds=self.data_source, transform=trans)
 
+    def isin(self, values: list):
+        # todo: check contents in values
+        trans = SQLFilterTransform(self, 'isin', values)
+
     @local_frame_wrapper
     def head(self, n=5):
         transform = SQLHeadTransform(self, n)
@@ -386,6 +397,14 @@ class DataFrame:
                                    default_handler, lines, compression, index, indent, storage_options)
 
     @binary_op_local_frame_wrapper
+    def isin(self, other):
+        if is_type(other, ArrayLike):
+            trans = SQLFilterTransform(self, 'in', other)
+        else:
+            raise TypeError('Currently not support other type isin operation')
+        return DataFrame(ds=self.data_source, transform=trans)
+
+    @binary_op_local_frame_wrapper
     def __add__(self, other):
         # add a number to the dataframe
         if isinstance(other, numbers.Number):
@@ -407,6 +426,8 @@ class DataFrame:
             raise TypeError('Subtraction with {} is not supported'.format(type(other)))
         return DataFrame(ds=self.data_source, transform=trans)
 
+    @binary_op_local_frame_wrapper
+    #todo: handle carefully
     def __rsub__(self, other):
         if isinstance(other, numbers.Number):
             trans = SQLBinaryOperationTransform(self, '-', other, True)
@@ -436,28 +457,28 @@ class DataFrame:
 
     @local_frame_wrapper
     def __eq__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
+        if is_type(other, ConstantTypes):
             trans = SQLFilterTransform(self, "eq", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __ge__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
+        if is_type(other, ConstantTypes):
             trans = SQLFilterTransform(self, "ge", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __gt__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
+        if is_type(other, ConstantTypes):
             trans = SQLFilterTransform(self, "gt", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __ne__(self, other):
-        if isinstance(other, int) or isinstance(other, float) or isinstance(other, str) or isinstance(other, datetime.date):
+        if is_type(other, ConstantTypes):
             trans = SQLFilterTransform(self, "ne", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
@@ -547,8 +568,11 @@ class DataFrame:
             warnings.warn('Assigned column(s) from a different table. Data will be handled locally')
             one_table = False
 
+        new_col = None
+
         if one_table:
             new_col = Column(key, col.dtype, table=col.tablename, transform=col.column_expr)
+
         return new_col
 
     def _format_column(self, key, val):
@@ -559,6 +583,22 @@ class DataFrame:
             else:
                 new_col.column_expr = '\''+val+'\''
             return new_col
+
+    def _handle_assign_locally(self, key, val):
+        self.materialize()
+        vs = []
+        if is_type(key, ArrayLike):
+            for k, v in zip(key, val):
+                if hasattr(v,'materialize'):
+                    vs.append(v.materialize())
+                else:
+                    vs.append(v)
+        else:
+            if hasattr(val, 'materialize'):
+                vs = val.materialize()
+
+        self.data[key] = vs
+        return DataFrame(data=self.data, ds=local_ds)
 
     def project(self, key, val):
         """
@@ -573,11 +613,11 @@ class DataFrame:
 
         # There is no corresponding pd function, have to invoke local pandas function manually
         if self.data is not None:
-            pdf = self.data[key]
+            pdf = self.data
             if isinstance(val, DataFrame):
                 val = val.data
             pdf[key] = val
-            return DataFrame(pdf)
+            return DataFrame(data=pdf, ds=local_ds)
 
         # validate the input having the correct size
         self._validate_input_column_size(key, val)
@@ -600,6 +640,8 @@ class DataFrame:
                         new_col = self._handle_df_cols(k, v)
                         if new_col:
                             all_cols[k] = new_col
+                        else:
+                            return self._handle_assign_locally(key, val)
         else:
             # we only allow 1 column to be assigned to a new column for now
             if len(val.columns) != 1:
@@ -608,6 +650,8 @@ class DataFrame:
             new_col = self._handle_df_cols(key, list(val.columns.values())[0])
             if new_col:
                 all_cols[key] = new_col
+            else:
+                return self._handle_assign_locally(key, val)
 
         trans = SQLProjectionTransform(self, all_cols)
         tb = DataFrame(transform=trans, ds=self.data_source)

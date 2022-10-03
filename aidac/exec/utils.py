@@ -19,8 +19,9 @@ def estimate_join_card(card1, card2, null1, null2, distinct1, distinct2):
 
 
 class Node:
-    def __init__(self, val='', children=None):
+    def __init__(self, val='', children=None, tbname=None):
         self.val = val
+        self.tbname = tbname
         self.children = children if children else [None, None]
 
     def add_child(self, child: Node, index=0):

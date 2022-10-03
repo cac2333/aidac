@@ -61,5 +61,9 @@ create_estimate_size:
 estimate_size:
   postgres: |-
     SELECT * FROM count_estimate($a${}$a$);
+
+estimate_distinct:
+  postgres: |-
+    
     
     

@@ -67,10 +67,12 @@ class Scheduler:
                         ex1.add_prereq(sblock)
             return ex1
         # self._dfs_link_ds(df)
+        start = time.time()
         ex = _gen_pipe(df)
         root_ex = RootExecutable()
         root_ex.add_prereq(ex)
         my_plan = root_ex.plan()
         print(my_plan)
+        print(f'planning takes time {time.time()-start}')
         return root_ex.process()
 

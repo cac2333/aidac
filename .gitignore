@@ -2,3 +2,4 @@
 build
 aidac.egg-info
 tests/ds_config.py
+scripts

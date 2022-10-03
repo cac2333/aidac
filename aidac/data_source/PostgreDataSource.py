@@ -19,9 +19,9 @@ DS = 'postgres'
 ql = QueryLoader(DS)
 
 
-typeConverter = { np.int8: 'TINYINT', np.int16: 'SMALLINT', np.int32: 'INT', np.int64: 'NUMERIC'
-    , np.float32: 'FLOAT', np.float64: 'FLOAT', np.object: 'VARCHAR(100)', np.object_: 'VARCHAR(100)', bytearray: 'BLOB'
-    , datetime.date: 'DATE', datetime.time: 'TIME', 'timestamp': 'TIMESTAMP', np.datetime64: 'TIMESTAMP'};
+typeConverter = { np.int8: 'TINYINT', np.int16: 'SMALLINT', np.int32: 'INT', np.int64: 'NUMERIC', float: 'FLOAT'
+    , np.float32: 'FLOAT', np.float64: 'FLOAT', np.object: 'VARCHAR(300)', np.object_: 'VARCHAR(300)', bytearray: 'BLOB'
+    , datetime.date: 'DATE', datetime.time: 'TIME', 'timestamp': 'TIMESTAMP', np.datetime64: 'TIMESTAMP'}
 
 typeConverter_rev = {'integer': np.int32, 'character varying': np.object, 'double precision': np.float64,
                      'numeric': np.float, 'character': np.object,
@@ -54,10 +54,16 @@ class PostgreDataSource(DataSource):
         import time
         start = time.time()
         column_name = ', '.join(list(cols.keys()))
+        data_len = 0
+        width = 0
         with self.__cursor.copy(ql.copy_data(table, column_name)) as copy:
             for row in generator(data):
+                width = len(row)
+                data_len += 1
                 copy.write_row(row)
         print('loading data time: '+str(start-time.time()))
+        print(f'imported data size {data_len*width}')
+
 
     def table_columns(self, table: str):
         qry = ql.table_columns(table)
@@ -106,7 +112,8 @@ class PostgreDataSource(DataSource):
         rs = self._execute(qry)
         # n_distinct = -1 if all values are distinct, otherwise a negative fraction is used
         # todo: maybe we can optimise this later
-        table_name, null_frac, n_distinct, mcv = rs.get_value()
+        val = rs.get_value()
+        table_name, null_frac, n_distinct, mcv = val if val else (table_name, 0, 1, [])
         # need to calculate the actual distinct values
         n_distinct = self.row_count(table_name) * (-n_distinct)
         return table_name, null_frac, n_distinct, mcv
@@ -115,7 +122,8 @@ class PostgreDataSource(DataSource):
         self._execute(ql.drop_estimation_func())
         self._execute(ql.create_estimation_func())
         qry = ql.get_estimation(qry)
-        return self._execute(qry).get_value()
+        rs = self._execute(qry)
+        return rs.get_value()
 
     def _execute(self, qry) -> ResultSet | None:
         self.__cursor.execute(qry)

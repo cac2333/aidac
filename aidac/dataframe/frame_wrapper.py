@@ -16,6 +16,7 @@ def create_remote_table(source, table_name):
 def _extract_frame(df):
     if isinstance(df, WFrame):
         return df._tail_frame
+    return df
 
 
 class WFrame:
@@ -96,35 +97,33 @@ class WFrame:
         pass
 
     def merge(self, other: WFrame, on=None, left_on=None, right_on=None, how='inner', suffixes=('_x', '_y'), sort=False):
-        df = self._tail_frame.merge(other._tail_frame, on, left_on, right_on, how, suffixes, sort)
+        df = self._tail_frame.merge(other._tail_frame, on=on, left_on=left_on, right_on=right_on,
+                                    how=how, suffixes=suffixes, sort=sort)
         return WFrame(df)
 
     def fillna(self, col=[], val=0):
-        return WFrame(self._tail_frame.fillna(col, val))
+        return WFrame(self._tail_frame.fillna(col=col, val=val))
 
     def dropna(self, col=[]):
-        return WFrame(self._tail_frame.dropna(col))
+        return WFrame(self._tail_frame.dropna(col=col))
 
     def drop_duplicates(self):
         return WFrame(self._tail_frame.drop_duplicates())
 
-    def sort_values(self, orderlist, ascending=True):
-        return WFrame(self._tail_frame.sort_values(orderlist, ascending))
-
     def query(self, expr: str):
-        return WFrame(self._tail_frame.query(expr))
+        return WFrame(self._tail_frame.query(expr=expr))
 
     def apply(self, func, axis=0):
-        return WFrame(self._tail_frame.apply(func, axis))
+        return WFrame(self._tail_frame.apply(func, axis=axis))
 
     def aggregate(self, projcols, groupcols=None):
-        return WFrame(self._tail_frame.aggregate(projcols, groupcols))
+        return WFrame(self._tail_frame.aggregate(projcols, groupcols=groupcols))
 
     def agg(self, collist=None):
         return WFrame(self._tail_frame.agg(collist))
 
     def contains(self, pat: str, case=True, regex=True):
-        return WFrame(self._tail_frame.contains(pat, case, regex))
+        return WFrame(self._tail_frame.contains(pat=pat, case=case, regex=regex))
 
     def head(self, n=5):
         return WFrame(self._tail_frame.head(n))
@@ -137,10 +136,13 @@ class WFrame:
         return WFrame(self._tail_frame.rename(columns))
 
     def groupby(self, by: Union[List[str], str], sort=True, axis=0):
-        return WFrame(self._tail_frame.groupby(by, sort, axis))
+        return WFrame(self._tail_frame.groupby(by, sort=sort, axis=axis))
 
     def sort_values(self,  orderlist: Union[List[str], str], ascending=True):
-        return WFrame(self._tail_frame.sort_values(orderlist, ascending))
+        return WFrame(self._tail_frame.sort_values(orderlist, ascending=ascending))
+
+    def reset_index(self, inplace=True):
+        return WFrame(self._tail_frame.reset_index(inplace=inplace))
 
     def count(self):
         return WFrame(self._tail_frame.count())
@@ -166,8 +168,11 @@ class WFrame:
         return self._tail_frame.to_json(path_or_buf, orient, date_format, double_precision, force_ascii, date_unit,
                                         default_handler, lines, compression, index, indent, storage_options)
 
+    def isin(self, other):
+        return WFrame(self._tail_frame.isin(_extract_frame(other)))
+
     def __add__(self, other):
-        return WFrame(self._tail_frame + other)
+        return WFrame(self._tail_frame + _extract_frame(other))
 
     def __radd__(self, other):
         return WFrame(other + self._tail_frame)

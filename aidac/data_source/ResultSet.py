@@ -70,6 +70,10 @@ class ResultSet:
                 except (ValueError, TypeError):
                     # print(f'column: {col}, row_value={row[idx1]}')
                     pass
+
+        row_max = len(self.data)
+        col_max = len(self.columns)
+        print(f'returned table size: {row_max*col_max}')
         return od
 
     def to_pd(self):

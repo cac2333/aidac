@@ -8,12 +8,11 @@ import numpy as np
 import time
 
 from typing import Dict
-
 from aidac.common.DataIterator import generator
 from aidac.common.column import Column
-from aidac.common.hist import Histgram
-from aidac.common.meta import MetaInfo
+from aidac.common.meta import MetaInfo, Histgram
 from aidac.dataframe import frame
+from aidac.dataframe.transforms import SQLProjectionTransform
 from aidac.exec.utils import *
 
 from aidac.data_source.DataSourceManager import manager, LOCAL_DS
@@ -63,7 +62,7 @@ def get_hist(df: frame.DataFrame, col: str):
         while df.transform is not None:
             df = df.transform.sources()
         table_name, null_frac, n_distinct, mcv = df.data_source.get_hist(df.table_name, col)
-        hist = Histgram(table_name, null_frac, n_distinct, mcv)
+        hist = Histgram(table_name, null_frac, n_distinct, mcv, col)
     return hist
 
 
@@ -72,10 +71,10 @@ class Executable:
         self.df = df
         self.prereqs = []
         self.planned_job = None
-        self.estimated_row = None
-        self.estimated_width = None
+        self.estimated_meta = None
         # result set sent back required
         self.rs_required = False
+        self.plans = None
 
     def to_be_executed_locally(self, df):
         """
@@ -114,7 +113,11 @@ class Executable:
             func = getattr(data, df._saved_func_name_)
             # print(df._saved_args_)
             # print(data.columns)
-            data = func(*df._saved_args_, **df._saved_kwargs_)
+            # todo: projection list saved args
+            if isinstance(df.transform, SQLProjectionTransform):
+                data = func(df._saved_args_, **df._saved_kwargs_)
+            else:
+                data = func(*df._saved_args_, **df._saved_kwargs_)
         return data
 
     def process(self):
@@ -138,7 +141,7 @@ class Executable:
             # materialize remote table
 
             sql = self.df.genSQL
-            print('sql generated: \n{}'.format(sql))
+            # print('sql generated: \n{}'.format(sql))
             ds = manager.get_data_source(self.planned_job)
 
             rs = ds._execute(sql)
@@ -150,27 +153,50 @@ class Executable:
             data = pd.DataFrame(data)
         self.clear_lineage()
         self.df._data_ = data
+        from aidac.data_source.DataSource import local_ds
+        self.df.set_ds(local_ds)
         return data
 
-    def plan(self):
+    def plan(self, jn_cols=[]):
+        if self.plans:
+            return self.plans
+
         all_paths = []
         if self.prereqs:
             for x in self.prereqs:
-                all_paths.extend(x.plan())
+                all_paths.extend(x.plan(jn_cols))
                 x.rs_required = self.rs_required
-                return all_paths
+                self.plans = all_paths
         else:
             # as we have no prereqs, all data has to be in the same database. Thus we can directly use genSQL
-            if self.df.data_source.job_name != LOCAL_DS:
-                self.estimated_row, self.estimated_width = \
+            start = time.time()
+            est_row, est_width = 0, 0
+            if self.df.data is None:
+                print(self.df)
+                est_row, est_width = \
                     self.df.data_source.get_estimation(self.df.genSQL)
+                # print(f'remote estimation takes {time.time()-start}')
             # if the data is local, then we have the actual data
             else:
-                self.estimated_row = len(self.df._data_)
-                self.estimated_width = len(self.df.columns) * 4 # todo: compute the actual size
+                est_row = len(self.df.data)
+                if est_row > 0:
+                    for c in self.df.columns:
+                        col = self.df.columns[c]
+                        est_width += col.get_size()
+                # print(f'local estimation takes {time.time()-start}')
+
+            meta = MetaInfo(self.df.columns, est_width, est_row)
+            # estimate histgram of each column
+            # todo: this only estimate on the original table
+            for c in self.df.columns:
+                if c in jn_cols:
+                    meta.cmetas[c] = get_hist(self.df, c)
+            self.estimated_meta = meta
             # total cost = 0, path = job_name
             # todo: explore all possible data sources
-            return [(0, Node(self.df.data_source.job_name, None))]
+            # print(f'base node plan for {self.df} takes {time.time()-start}')
+            self.plans = [(0, Node(self.df.data_source.job_name, None, str(self.df)))]
+        return self.plans
 
     def add_prereq(self, *other: list[Executable]):
         self.prereqs.extend(other)
@@ -229,7 +255,7 @@ class TransferExecutable(Executable):
         if self.dest is not None:
             self.transfer(self.df, self.dest)
 
-    def plan(self):
+    def plan(self, jn_cols=[]):
         return
 
     def add_prereq(self, other: Executable):
@@ -243,6 +269,7 @@ class RootExecutable(Executable):
     def __init__(self):
         self.prereqs = []
         self.rs_required = True
+        self.plans = None
 
     def _get_lowest_cost_path(self, paths):
         lowest, opt_path = paths[0]
@@ -250,7 +277,7 @@ class RootExecutable(Executable):
             if cost < lowest:
                 lowest = cost
                 opt_path = path
-        return opt_path
+        return opt_path, lowest
 
     def _insert_transfer_block(self, cur: Executable, path: Node):
         if path:
@@ -275,14 +302,15 @@ class RootExecutable(Executable):
             cur.prereqs.clear()
             cur.prereqs.extend(transfer_blocks)
 
-    def plan(self):
+    def plan(self, jn_cols=[]):
         self.prereqs[0].rs_required = True
         all_path = super().plan()
         # only need to insert transfer block when other schedule executables are involved
         if all_path:
-            path = self._get_lowest_cost_path(all_path)
+            path, lowest = self._get_lowest_cost_path(all_path)
             self._insert_transfer_block(self, path)
             self.pre_process()
+        print(f'estimated cost: {lowest}')
         return path
 
     def process(self):
@@ -310,6 +338,7 @@ class ScheduleExecutable(Executable):
         self.prev_ex = prev_ex
         self.prereqs = []
         self.rs_required = False
+        self.plans = None
 
     def _traverse2end(self, df: frame.DataFrame):
         """
@@ -354,19 +383,15 @@ class ScheduleExecutable(Executable):
         # todo: maxc might not be the desired opt meta
         return opt, maxc
 
-    def plan(self):
-        all_path = []
-        for x in self.prereqs:
-            path = x.plan()
-            all_path.append(path)
-        return self.find_local_transfer_costs(all_path)
+    def plan(self, jn_cols=[]):
+        return self.find_local_transfer_costs(jn_cols)
 
     def _convert_to_width(self, cols: Dict[str, Column]):
         for cname, col in cols:
             kclass = globals()[str(col.dtype)]()
             sys.getsizeof(kclass)
 
-    def find_local_transfer_costs(self, prev_dest=[]):
+    def find_local_transfer_costs(self, jn_cols=[]):
         """compute the transfer cost for all possible data transferring at the local level
         all_dest format:
         [cost, all target job destination along the path(e.g. ['job1', 'job2'])]
@@ -382,13 +407,14 @@ class ScheduleExecutable(Executable):
             # we calculate the cost for all possible path
             # (for every previous path we compute the transfer cost between it and every possible new destination)
             assert len(self.prereqs) == 2
-            plan1 = self.prereqs[0].plan()
-            plan2 = self.prereqs[1].plan()
 
-            estimate_card = self.estimate_join_card(self.prereqs[0], self.prereqs[1]) if jn_flag else self.estimate_filter_card(trans)
-            self.prev_ex.estimated_row = estimate_card
-            # todo: change width
-            self.prev_ex.estimated_width = len(self.prev.columns)*4
+            plan1 = self.prereqs[0].plan([x[0] for x in trans.join_cols] if jn_flag else [] + jn_cols)
+            plan2 = self.prereqs[1].plan([x[1] for x in trans.join_cols] if jn_flag else [] + jn_cols)
+
+            start = time.time()
+            self.prev_ex.estimated_meta = self.estimate_meta(self.prereqs[0], self.prereqs[1])
+            # print(f'estimate for {self.prev} takes {time.time()-start}')
+
             all_plans = []
             # todo: handle projection where the filter comes from a differebt source
             for cost1, path1 in plan1:
@@ -397,7 +423,7 @@ class ScheduleExecutable(Executable):
                     if path1.val == path2.val:
                         # the two branches are from the same ds, thus no extra transfer is required
                         job_name = path1.val
-                        new_path = Node(job_name, [path1, path2])
+                        new_path = Node(job_name, [path1, path2], str(self.prev))
                         new_cost = cost1 + cost2
                         all_plans.append((new_cost, new_path))
                     else:
@@ -405,17 +431,17 @@ class ScheduleExecutable(Executable):
                         if not jn_flag:
                             raise ValueError('Remote filtering is not supported')
                         # path separate as there are two possible destinations
-                        new_path = Node(path1.val, [path1, path2])
+                        new_path = Node(path1.val, [path1, path2], str(self.prev))
                         # todo: write it in a better way
-                        new_cost = cost1 + cost2 + self.prior_join_cost(self.prereqs[1], path1.val, path2.val, estimate_card)
+                        new_cost = cost1 + cost2 + self.prior_join_cost(self.prereqs[1], path1.val, path2.val)
                         all_plans.append((new_cost, new_path))
 
-                        new_path = Node(path2.val, [path1, path2])
-                        new_cost = cost1 + cost2 + self.prior_join_cost(self.prereqs[0], path2.val, path1.val, estimate_card)
+                        new_path = Node(path2.val, [path1, path2], str(self.prev))
+                        new_cost = cost1 + cost2 + self.prior_join_cost(self.prereqs[0], path2.val, path1.val)
                         all_plans.append((new_cost, new_path))
         return all_plans
 
-    def prior_join_cost(self, other_table, my_dest, other_dest,  joined_card):
+    def prior_join_cost(self, other_table, my_dest, other_dest):
         """
         compute the transferring cost if the other table does not have the same data source destination
         @param other_table: the other table in the join
@@ -425,20 +451,32 @@ class ScheduleExecutable(Executable):
         @return:
         """
         if my_dest != other_dest:
-            meta = MetaInfo(other_table.df.columns, other_table.estimated_width, other_table.estimated_row)
-            cost_before = meta.nrows*meta.ncols
+            meta = MetaInfo(other_table.df.columns, other_table.estimated_meta.cwidth, other_table.estimated_meta.nrows)
+            cost_before = meta.nrows*meta.cwidth
         else:
             cost_before = 0
 
-        joined_card = joined_card if self.rs_required and my_dest != LOCAL_DS else 0
+        est_meta = self.prev_ex.estimated_meta
+        joined_card = est_meta.nrows*est_meta.cwidth if self.rs_required and my_dest != LOCAL_DS else 0
 
         return cost_before + joined_card
 
     def estimate_filter_card(self, trans):
         # todo: update the data source to be used
-        self.estimated_row, self.estimated_width = \
-            self.prev.data_source.get_estimation(trans.genSQL)
-        return self.estimated_row * self.estimated_width
+        nr, nw = self.prev.data_source.get_estimation(trans.genSQL)
+        return nr*nw
+
+    def estimate_meta(self, tbl1, tbl2):
+        from aidac.dataframe.transforms import SQLJoinTransform
+        if isinstance(self.prev.transform, SQLJoinTransform):
+            est_row = self.estimate_join_card(tbl1, tbl2)
+        else:
+            est_row = self.estimate_filter_card(self.prev.transform)
+        est_width = 0
+        for c in self.prev.columns:
+            col = self.prev.columns[c]
+            est_width += col.get_size()
+        return MetaInfo(self.prev.columns, est_width, est_row)
 
     def estimate_join_card(self, tbl1, tbl2):
         """
@@ -446,19 +484,29 @@ class ScheduleExecutable(Executable):
         @param count_result: whether the result set will be transfered
         @return:
         """
-        meta1 = MetaInfo(tbl1.df.columns, tbl1.estimated_row, tbl1.estimated_width)
-        meta2 = MetaInfo(tbl2.df.columns, tbl2.estimated_row, tbl2.estimated_width)
+        meta1 = tbl1.estimated_meta
+        meta2 = tbl2.estimated_meta
 
         trans = self.prev.transform
 
-        from aidac.dataframe.transforms import SQLJoinTransform
+        # choose the column with the largest distinct value to work with
+        distinct1, distinct2 = 0, 0
 
-        assert isinstance(trans, SQLJoinTransform)
-        # join1_cols, join2_cols = trans.join_cols
-        # hist1 = get_hist(tbl1.df, join1_cols)
-        # hist2 = get_hist(tbl2.df, join2_cols)
+        for jc1, jc2 in trans.join_cols:
+            # mismatch distinct values do not matter for now as we only use the biggest value
+            if jc1 in meta1.cmetas and jc2 in meta2.cmetas:
+                d1 = meta1.cmetas[jc1].n_distinct
+                distinct1 = d1 if d1 > distinct1 else distinct1
+                d2 = meta2.cmetas[jc2].n_distinct
+                distinct2 = d2 if d2 > distinct2 else distinct2
+
+        if distinct1 == 0:
+            distinct1 = meta1.nrows
+
+        if distinct2 == 0:
+            distinct2 = meta2.nrows
         # todo: use new estimation
-        rs_card = estimate_join_card(meta1.nrows, meta2.nrows, 0, 0, meta1.nrows, meta2.nrows)
+        rs_card = estimate_join_card(meta1.nrows, meta2.nrows, 0, 0, distinct1, distinct2)
         return rs_card
 
     # remove redundant transfer blocks if the dest and the origin are the same

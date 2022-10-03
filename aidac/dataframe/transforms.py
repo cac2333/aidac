@@ -327,8 +327,9 @@ class SQLProjectionTransform(SQLTransform):
                 col.column_expr) else col.srccol[0]) + ' AS ' + col.name);
 
         # we need to append the selection part here
+        # when the operation has the format df[df[]>sth], the projectiontransform holds 2 parents,
+        # second one is the condition dataframe and the first is the outer table
         if is_type(self._source_, ArrayLike):
-            assert isinstance(self._source_[1].transform, SQLFilterTransform)
             cond_text = ' '+self._source_[1].transform.gen_condition()
             src_table = self._source_[0]
         else:
@@ -368,7 +369,10 @@ class SQLJoinTransform(SQLTransform):
         """
         @return: the join columns of 2 sources as a tuple
         """
-        return self._src1joincols_, self._src2joincols_
+        if isinstance(self._src1joincols_, str):
+            return [(self._src1joincols_, self._src2joincols_)]
+        else:
+            return [(x, y) for x, y in zip(self._src1joincols_, self._src2joincols_)]
 
     @property
     def columns(self):
@@ -636,7 +640,7 @@ class SQLGroupByTransform(SQLTransform):
 
             src_cols = source.columns
 
-            print("src cols:= ",src_cols)
+            # print("src cols:= ",src_cols)
             columns = collections.OrderedDict()
 
             for col in src_cols:
@@ -655,7 +659,7 @@ class SQLGroupByTransform(SQLTransform):
             self._gen_column(self._source_)
             # self._group_columns_
             # self._columns_ = self._source_.columns
-            print("current self._columns_ is :=",self._columns_)
+            # print("current self._columns_ is :=",self._columns_)
         return self._columns_
 
     @property
@@ -743,8 +747,8 @@ class SQLFillNA(SQLTransform):
 
         return sqltext
 
-class SQLContainsTransform(SQLTransform):
 
+class SQLContainsTransform(SQLTransform):
     def __init__(self, source, pat, case, regex):
         super().__init__(source)
         self._pattern_ = pat
@@ -757,14 +761,14 @@ class SQLContainsTransform(SQLTransform):
             self._columns_ = self._source_.columns
         return self._columns_
 
-    @property
-    def genSQL(self):
-        col = None
-        for c in self.columns:
-            col = self.columns[c]
-
+    def gen_clauses(self):
+        # get the only column
+        col = next(iter(self.columns.values()))
 
         is_all_alnum = True
+
+        if self._regex_:
+            return col.name + ' '+'~' + ' ' + "'" + self._pattern_ + "'"
 
         for i in self._pattern_:
             if not i.isalnum():
@@ -773,10 +777,8 @@ class SQLContainsTransform(SQLTransform):
         if self._regex_ and is_all_alnum:
             self._pattern_ = '%' + self._pattern_ + '%'
 
-        # sqltext = 'SELECT * FROM ' + '(' + self._source_.genSQL + ') ' + self._source_.table_name + ' WHERE ' + col.name + ' '
-
         if not self._case_:
-            sqltext = 'SELECT * FROM ' + '(' + self._source_.genSQL + ') ' + self._source_.table_name + ' WHERE ' + 'LOWER' + '(' + col.name + ')' + ' '
+            sqltext = 'LOWER' + '(' + col.name + ')' + ' '
             self._pattern_ = self._pattern_.lower()
             if self._regex_:
                 sqltext += 'LIKE' + ' ' + "'" + self._pattern_ + "'"
@@ -786,15 +788,32 @@ class SQLContainsTransform(SQLTransform):
                 return sqltext
 
         else:
-            sqltext = 'SELECT * FROM ' + '(' + self._source_.genSQL + ') ' + self._source_.table_name + ' WHERE ' + col.name + ' '
+            sqltext = col.name + ' '
             if self._regex_:
                 sqltext += 'LIKE' + ' ' + "'" + self._pattern_ + "'"
                 return sqltext
             else:
                 sqltext += 'LIKE' + ' ' + "'" + '%' + self._pattern_ + '%' + "'"
                 return sqltext
-        # if self._regex_:
-        #     sqltext += 'LIKE' + ' ' + self._pattern_
+
+    def gen_condition(self):
+        return ' WHERE ' + self.gen_clauses()
+
+    @property
+    def genSQL(self):
+        is_all_alnum = True
+
+        for i in self._pattern_:
+            if not i.isalnum():
+                is_all_alnum = False
+
+        if self._regex_ and is_all_alnum:
+            self._pattern_ = '%' + self._pattern_ + '%'
+
+        sqltext = 'SELECT * FROM ' + '(' + self._source_.genSQL + ') ' + self._source_.table_name + self.gen_condition()
+
+        return sqltext
+
 
 
 
@@ -917,7 +936,22 @@ class SQLFilterTransform(SQLTransform):
         return isinstance(o, float)
 
     def is_date_time(self, o):
-        return isinstance(o, datetime.date)
+        return isinstance(o, datetime.date) or isinstance(o, np.datetime64)
+
+    def is_same_type_generic(self, o1, o2):
+        """
+
+        @param o1: self column
+        @param o2: other values
+        @return:
+        """
+        same_type_flag = True
+        if is_type(o2, ArrayLike):
+            for o in o2:
+                same_type_flag = same_type_flag & self.is_same_type(o, o1)
+        else:
+            same_type_flag = self.is_same_type(o2, o1)
+        return same_type_flag
 
     def is_same_type(self, o1, o2):
         if self.is_date_time(o1):
@@ -933,10 +967,12 @@ class SQLFilterTransform(SQLTransform):
     def _format_const(self, val):
         if isinstance(val, str) or self.is_date_time(val):
             return '\'{}\''.format(val)
-        elif hasattr(val, 'transform') and isinstance(val.transform, SQLFilterTransform):
+        elif hasattr(val, 'transform') and hasattr(val.transform, 'gen_clauses'):
             return '('+val.transform.gen_clauses()+')'
         elif is_type(val, ConstantTypes):
             return str(val)
+        elif is_type(val, ArrayLike):
+            return '('+','.join([self._format_const(v) for v in val])+')'
         else:
             raise ValueError('Filter on unsupported type {}'.format(type(val)))
 
@@ -952,9 +988,10 @@ class SQLFilterTransform(SQLTransform):
         src_cols = self._source_.columns
         clauses = []
         # compare with a single value
-        if is_type(self._other_, ConstantTypes):
+        # todo: does isin support multiple columns?
+        if is_type(self._other_, ConstantTypes) or (is_type(self._other_, ArrayLike) and self._op_ == 'in'):
             for cname, col in src_cols.items():
-                if self.is_same_type(self._other_, col.dtype):
+                if self.is_same_type_generic(col.dtype, self._other_):
                     cl = cname + ' ' + self._op_ + ' ' + self._format_const(self._other_)
                     clauses.append(cl)
                 else:
@@ -1005,7 +1042,7 @@ class SQLFilterTransform(SQLTransform):
             col_type = col.dtype
             # print(" COLUMN DATETYPE IS : ", col_type)
             col_name = col.name
-            if self.is_same_type(self._other_, col_type):
+            if self.is_same_type_generic(col_type, self._other_):
                 # print("dddddddd")
                 sqltext += "CASE WHEN " + col_name + " " + self._op_ + " " + self._format_const(self._other_) + " THEN TRUE ELSE FALSE END AS " + col_name + ", "
             else:
@@ -1050,6 +1087,8 @@ class SQLQuery(SQLTransform):
 
             cur += char
 
+        # replace python str search syntax with db's
+        re.sub(r'\.str\.match\(()\)', ' LIKE \\1', cur)
         query = self._source_.genSQL + ' WHERE ' + cur
 
         return query

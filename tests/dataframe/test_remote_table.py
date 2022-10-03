@@ -204,6 +204,21 @@ class MyTestCase(unittest.TestCase):
                               "TRUE ELSE FALSE END AS phone, CASE WHEN iid <= 6 THEN TRUE ELSE FA"
                               "LSE END AS iid FROM (SELECT * FROM midwife) midwife")
 
+    def test_isin(self):
+        filtered = self.midwife_['prac_id'].isin([2, 3, 5])
+        sql = filtered.genSQL
+        self.assertRegex(
+            sql,
+            r"SELECT CASE WHEN prac_id in \(2,3,5\) THEN TRUE ELSE FALSE END AS prac_id "
+            r"FROM \(SELECT prac_id AS prac_id FROM \(SELECT \* FROM midwife\) midwife\) SQLProjectionTransform\d+"
+        )
+
+        proj = self.midwife_[self.midwife_['prac_id'].isin([2, 3, 5])]
+        sql = proj.genSQL
+        self.assertEqual(sql,
+                         "SELECT prac_id AS prac_id, email AS email, name AS name, phone AS phone, "
+                         "iid AS iid FROM (SELECT * FROM midwife) midwife WHERE prac_id in (2,3,5)")
+
     def test_agg(self):
         ag = self.midwife_.agg("count", ["name", "iid"])
         self.assertTrue(isinstance(ag.transform, SQLAGG_Transform))
