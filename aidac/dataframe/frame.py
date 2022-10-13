@@ -114,7 +114,8 @@ class DataFrame:
 
     @local_frame_wrapper
     def reset_index(self, inplace=True):
-        return self
+        transform = SQLPlaceHolder(self)
+        return DataFrame(ds=self.data_source, transform=transform)
 
     """
     override so that any unsupported function call directly goes to pandas 
@@ -375,6 +376,11 @@ class DataFrame:
         return DataFrame(ds=self.data_source, transform=trans)
 
     @local_frame_wrapper
+    def mean(self):
+        trans = SQLAGG_Transform(self, func='avg', collist=self.columns.keys())
+        return DataFrame(df=self.data_source, transform=trans)
+
+    @local_frame_wrapper
     def min(self):
         trans = SQLAGG_Transform(self, func='min', collist=self.columns.keys())
         return DataFrame(ds=self.data_source, transform=trans)
@@ -457,42 +463,42 @@ class DataFrame:
 
     @local_frame_wrapper
     def __eq__(self, other):
-        if is_type(other, ConstantTypes):
+        if is_type(other, ConstantTypes) or is_type(other, DataFrame):
             trans = SQLFilterTransform(self, "eq", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __ge__(self, other):
-        if is_type(other, ConstantTypes):
+        if is_type(other, ConstantTypes) or is_type(other, DataFrame):
             trans = SQLFilterTransform(self, "ge", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
-    def __gt__(self, other):
-        if is_type(other, ConstantTypes):
+    def __gt__(self, other) :
+        if is_type(other, ConstantTypes) or is_type(other, DataFrame):
             trans = SQLFilterTransform(self, "gt", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __ne__(self, other):
-        if is_type(other, ConstantTypes):
+        if is_type(other, ConstantTypes) or is_type(other, DataFrame):
             trans = SQLFilterTransform(self, "ne", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
-    def __lt__(self, other):
-        if is_type(other, ConstantTypes):
+    def __lt__(self, other) :
+        if is_type(other, ConstantTypes) or is_type(other, DataFrame):
             trans = SQLFilterTransform(self, "lt", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")
 
     @local_frame_wrapper
     def __le__(self, other):
-        if is_type(other, ConstantTypes):
+        if is_type(other, ConstantTypes) :
             trans = SQLFilterTransform(self, "le", other)
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison is not supported by remotetables")

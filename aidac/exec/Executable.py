@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 
 import time
+import random
 
 from typing import Dict
 from aidac.common.DataIterator import generator
@@ -17,6 +18,7 @@ from aidac.exec.utils import *
 
 from aidac.data_source.DataSourceManager import manager, LOCAL_DS
 
+BOUND1 = 200
 
 def is_local(df1: frame.DataFrame, df2: frame.DataFrame):
     """
@@ -55,6 +57,7 @@ def get_meta(df: frame.DataFrame):
 def get_hist(df: frame.DataFrame, col: str):
     if df._data_ is not None:
         total = len(df.data)
+        # todo: handle empty set, same as the groupby part
         n_null = df.data[col].isnull().sum()
         n_distinct = len(np.unique(df.data[col].to_numpy()))
         hist = Histgram(df.table_name, n_null/total, n_distinct)
@@ -64,6 +67,27 @@ def get_hist(df: frame.DataFrame, col: str):
         table_name, null_frac, n_distinct, mcv = df.data_source.get_hist(df.table_name, col)
         hist = Histgram(table_name, null_frac, n_distinct, mcv, col)
     return hist
+
+
+def _random_sampling_string_len(col: pd.Series):
+    """
+    @param bound1: above which the random sampling should be used
+    @param bound2: above which a fixed number of sample points should be used
+    @param p: percentage to select
+    @return:
+    """
+    col = col.to_numpy(copy=False)
+    total = 0
+    if len(col) <= BOUND1:
+        for e in col:
+            total += sys.getsizeof(e)
+        total = total/len(col)
+    else:
+        idxs = random.sample(range(len(col)), BOUND1)
+        for id in idxs:
+            total += sys.getsizeof(col[id])
+        total = total/BOUND1
+    return total
 
 
 class Executable:
@@ -103,6 +127,8 @@ class Executable:
         if isinstance(sources, tuple):
             data1 = self.perform_local_operation(sources[0])
             data2 = self.perform_local_operation(sources[1])
+            if len(data1) == 0 or len(data2)==0:
+                print(f"perform locally on empty dataset: {df}")
             func = getattr(pd.DataFrame, df._saved_func_name_)
             data = func(data1, data2, **df._saved_kwargs_)
         else:
@@ -110,6 +136,8 @@ class Executable:
                 data = self.perform_local_operation(sources)
             else:
                 data = sources.data
+            if len(data) == 0:
+                print(f"perform locally on empty dataset: {df}")
             func = getattr(data, df._saved_func_name_)
             # print(df._saved_args_)
             # print(data.columns)
@@ -131,25 +159,31 @@ class Executable:
         for x in self.prereqs:
             x.process()
 
-        # print('process, planned job={}'.format(self.planned_job))
+        print('process, planned job={}'.format(self.planned_job))
         start = time.time()
         if self.planned_job == LOCAL_DS:
             # local pandas operation
             assert self.to_be_executed_locally(self.df)
             data = self.perform_local_operation(self.df)
+            print(f'pandas takes time: {time.time()-start}')
         else:
             # materialize remote table
 
             sql = self.df.genSQL
             # print('sql generated: \n{}'.format(sql))
             ds = manager.get_data_source(self.planned_job)
+            print('***************\n'+sql+'\n++**********')
+            expl = 'explain analyze ('+sql+')'
+            rs = ds._execute(expl)
+            print('***************explain****************')
+            print(rs.data)
 
             rs = ds._execute(sql)
 
             returned = time.time()
-            data = rs.get_result_table()
+            data = rs.to_tb(self.df.columns)
             # get result table and convert to dataframe
-            print('sql time = {}, conversion time = {}'.format(returned-start, time.time()-returned))
+            print('sql time = {}, conversion time = {}, total={}'.format(returned-start, time.time()-returned, time.time()-start))
             data = pd.DataFrame(data)
         self.clear_lineage()
         self.df._data_ = data
@@ -182,7 +216,10 @@ class Executable:
                 if est_row > 0:
                     for c in self.df.columns:
                         col = self.df.columns[c]
-                        est_width += col.get_size()
+                        if isinstance(col.dtype, object):
+                            est_width += _random_sampling_string_len(self.df.data[c])
+                        else:
+                            est_width += col.get_size()
                 # print(f'local estimation takes {time.time()-start}')
 
             meta = MetaInfo(self.df.columns, est_width, est_row)
@@ -412,6 +449,7 @@ class ScheduleExecutable(Executable):
             plan2 = self.prereqs[1].plan([x[1] for x in trans.join_cols] if jn_flag else [] + jn_cols)
 
             start = time.time()
+            # todo: should the prev_ex be assigned this value?
             self.prev_ex.estimated_meta = self.estimate_meta(self.prereqs[0], self.prereqs[1])
             # print(f'estimate for {self.prev} takes {time.time()-start}')
 
@@ -426,19 +464,23 @@ class ScheduleExecutable(Executable):
                         new_path = Node(job_name, [path1, path2], str(self.prev))
                         new_cost = cost1 + cost2
                         all_plans.append((new_cost, new_path))
+                        new_path.jcost = new_cost
                     else:
                         # currently does not support remote filter as the db does not have an order
                         if not jn_flag:
                             raise ValueError('Remote filtering is not supported')
                         # path separate as there are two possible destinations
+                        # use path1 as destination
                         new_path = Node(path1.val, [path1, path2], str(self.prev))
                         # todo: write it in a better way
                         new_cost = cost1 + cost2 + self.prior_join_cost(self.prereqs[1], path1.val, path2.val)
                         all_plans.append((new_cost, new_path))
+                        new_path.jcost = new_cost
 
                         new_path = Node(path2.val, [path1, path2], str(self.prev))
                         new_cost = cost1 + cost2 + self.prior_join_cost(self.prereqs[0], path2.val, path1.val)
                         all_plans.append((new_cost, new_path))
+                        new_path.jcost = new_cost
         return all_plans
 
     def prior_join_cost(self, other_table, my_dest, other_dest):
@@ -457,13 +499,16 @@ class ScheduleExecutable(Executable):
             cost_before = 0
 
         est_meta = self.prev_ex.estimated_meta
-        joined_card = est_meta.nrows*est_meta.cwidth if self.rs_required and my_dest != LOCAL_DS else 0
+        joined_card = est_meta.nrows*est_meta.cwidth if my_dest != LOCAL_DS else 0
+            # if self.rs_required and my_dest != LOCAL_DS else 0
 
         return cost_before + joined_card
 
     def estimate_filter_card(self, trans):
-        # todo: update the data source to be used
-        nr, nw = self.prev.data_source.get_estimation(trans.genSQL)
+        # todo: validate if the tables exist in that data source
+        for s in manager.all_data_sources():
+            if s != LOCAL_DS:
+                nr, nw = manager.get_data_source(s).get_estimation(trans.genSQL)
         return nr*nw
 
     def estimate_meta(self, tbl1, tbl2):

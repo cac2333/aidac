@@ -3,6 +3,9 @@ from collections.abc import Iterable
 
 import numpy as np
 
+type_map = {
+    "date": "datetime64[D]"
+}
 
 class ResultSet:
     def __init__(self, cols: Iterable, data: Iterable):
@@ -74,6 +77,30 @@ class ResultSet:
         row_max = len(self.data)
         col_max = len(self.columns)
         print(f'returned table size: {row_max*col_max}')
+        return od
+
+    def to_tb(self, tracked_cols):
+        od = collections.OrderedDict()
+
+        if not self.data:
+            return od
+
+        for idx1, col_name in enumerate(tracked_cols):
+            # tp = type(self.data[0][idx1])
+            col = tracked_cols[col_name]
+            tp = col.dtype if col.dtype not in type_map else type_map[col.dtype]
+
+            od[col.name] = np.empty(len(self.data), dtype=tp)
+            for idx2, row in enumerate(self.data):
+                try:
+                    od[col.name][idx2] = row[idx1]
+                except (ValueError, TypeError):
+                    # print(f'column: {col}, row_value={row[idx1]}')
+                    pass
+
+        row_max = len(self.data)
+        col_max = len(self.columns)
+        print(f'returned table size: {row_max}*{col_max}')
         return od
 
     def to_pd(self):

@@ -125,7 +125,9 @@ def mini_05(locs, remotes):
 
 
 def mini_06(locs, remotes):
+    start = time.time()
     tbs = read_tables(locs, remotes)
+    print(f'*******read tables={time.time()-start}**********')
     p = tbs['part']
     p = p[(p['p_size'] == 15)]
     if 'part' in locs:
@@ -140,6 +142,7 @@ def mini_06(locs, remotes):
     n = tbs['nation']
     n = n[['n_nationkey', 'n_regionkey', 'n_name']]
     n.materialize()
+    print(f'*******1st mat={time.time() - start}**********')
     r = tbs['region']
     r = r[r['r_name'] == 'EUROPE']
     r = r[['r_regionkey']]
@@ -147,7 +150,7 @@ def mini_06(locs, remotes):
     j = ps.merge(s, left_on='ps_suppkey', right_on='s_suppkey')
     j = j.merge(n, left_on='s_nationkey', right_on='n_nationkey')
     j.materialize()
-    print(f'jned size {len(j.data)*len(j.columns)*4}')
+    print(f'*******2nd mat={time.time() - start}**********')
     j = j.merge(r, left_on='n_regionkey', right_on='r_regionkey')
 
     ti = j[['ps_partkey', 'ps_supplycost']].groupby('ps_partkey').min()
@@ -294,16 +297,18 @@ def q_15_v1(locs, remotes):
     p = p[['p_partkey', 'p_brand', 'p_container']]
 
     ti = l.merge(p, left_on='l_partkey', right_on='p_partkey')
+    # todo: having t=ti here cause datasource to be none
     t = ti
-    ti = ti[['p_partkey', 'l_quantity']]
+    ti = ti[['p_partkey', 'l_quantity']].head(200)
     ti.materialize()
-    ti = ti.groupby('p_partkey').agg('mean')
+    print(ti.data)
+    ti = ti.groupby('p_partkey').mean()
     ti['avg_qty'] = ti['l_quantity'] * 0.2
     ti.reset_index(inplace=True)
-    ti = ti[['i_partkey', 'avg_qty']]
+    ti = ti[['p_partkey', 'avg_qty']]
 
     t = t[(t['p_brand'] == 'Brand#23') & (t['p_container'] == 'MED BOX')]
-    t = t.merge(ti, left_on='p_partkey', right_on='i_partkey')
+    t = t.merge(ti, left_on='p_partkey', right_on='p_partkey')
     t = t[t['l_quantity'] < t['avg_qty']]
     t.materialize()
     t = t[['l_extendedprice']]
@@ -317,19 +322,19 @@ def measure_time(func, *args):
     rs.materialize()
     # print('materialized')
     end = time.time()
-    # print(rs.data)
+    print(rs.data)
     print('Function {} takes time {}'.format(func, end-start))
 
 
 if __name__ == '__main__':
     connect(db_config['host'], db_config['schema'], db_config['db'], db_config['port'], db_config['user'],
                  db_config['passwd'])
-    full_qry = ['mini_03', 'mini_05', 'mini_06', 'q_03_v1', 'q_13_v1']
+    full_qry = ['mini_03', 'mini_05', 'mini_06', 'q_03_v1', 'q_10_v1', 'q_13_v1']
     qrys = ['mini_06']
     for q in qrys:
         for ls, rs in table_dist[q]:
             try:
-                print('----------------------------------------------\n'
+                print('\n----------------------------------------------\n'
                       'test qry {}, locals: {}, remotes: {}\n'
                       '---------------------------------------------'.format(q, ls, rs))
                 measure_time(locals()[q], ls, rs)

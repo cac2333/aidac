@@ -153,6 +153,9 @@ class WFrame:
     def min(self):
         return WFrame(self._tail_frame.min())
 
+    def mean(self):
+        return WFrame(self._tail_frame.mean())
+
     def max(self):
         return WFrame(self._tail_frame.max())
 

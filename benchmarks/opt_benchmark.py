@@ -67,6 +67,9 @@ def mini_02(locs, remotes):
     return l
 
 
+"""
+SELECT * FROM lineitem, orders WHERE o_orderpriority='1-URGENT' AND o_orderkey=l_orderkey
+"""
 def mini_03(locs, remotes):
     sqls = {'lineitem': """SELECT * FROM lineitem""",
             'orders': """SELECT * FROM orders WHERE o_orderpriority=\'1-URGENT\'"""}
@@ -109,6 +112,7 @@ def mini_06(locs, remotes):
     ps = tbs['partsupp']
     if 'partsupp' in locs:
         ps = ps[['ps_suppkey', 'ps_supplycost', 'ps_partkey']]
+    print(ps)
 
     s = tbs['supplier']
     if 'supplier' in locs:
@@ -125,6 +129,7 @@ def mini_06(locs, remotes):
     j = j.merge(r, left_on='n_regionkey', right_on='r_regionkey')
 
     ti = j[['ps_partkey', 'ps_supplycost']].groupby('ps_partkey').min()
+    print(ti)
     return ti
 
 def q_03_v1(locs, remotes):
@@ -225,9 +230,37 @@ def q_13_v1(locs, remotes):
     t.sort_values(['c_custkey', 'o_orderkey'], ascending=[False, False])
     return t
 
-def q_15_V1(locs, remotes):
-    pass
+def q_15_v1(locs, remotes):
+    sqls = {
+        'lineitem': """SELECT l_partkey, l_quantity, l_extendedprice from lineitem""",
+        'part': """SELECT p_partkey, p_brand, p_container from part"""
+    }
 
+    tbs = read_tables(locs, remotes, sqls)
+    l = tbs['lineitem']
+    if 'lineitem' in sqls:
+        l = l[['l_partkey', 'l_quantity', 'l_extendedprice']]
+
+    p = tbs['part']
+    if 'part' in sqls:
+        p = p[['p_partkey', 'p_brand', 'p_container']]
+
+    ti = l.merge(p, left_on='l_partkey', right_on='p_partkey')
+    t = ti
+    ti = ti[['p_partkey', 'l_quantity']]
+    ti.materialize()
+    ti = ti.groupby('p_partkey').mean()
+    ti['avg_qty'] = ti['l_quantity'] * 0.2
+    ti.reset_index(inplace=True)
+    ti = ti[['p_partkey', 'avg_qty']]
+
+    t = t[(t['p_brand'] == 'Brand#23') & (t['p_container'] == 'MED BOX')]
+    t = t.merge(ti, left_on='p_partkey', right_on='p_partkey')
+    t = t[t['l_quantity'] < t['avg_qty']]
+    t.materialize()
+    t = t[['l_extendedprice']]
+    t = t.sum()
+    return t
 
 def measure_time(func, *args):
     start = time.time()
@@ -242,7 +275,7 @@ my_db = Database(db_config['host'], db_config['schema'], db_config['db'], db_con
 
 
 if __name__ == '__main__':
-    qrys = ['q_13_v1']
+    qrys = ['mini_06']
     for q in qrys:
         for ls, rs in table_dist[q]:
             print('----------------------------------------------\n'

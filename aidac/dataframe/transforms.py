@@ -346,6 +346,21 @@ class SQLProjectionTransform(SQLTransform):
         return False
 
 
+class SQLPlaceHolder(SQLTransform):
+    def __init__(self, source):
+        super().__init__(source)
+
+    @property
+    def columns(self):
+        if self._columns_ is None:
+            self._columns_ = super.columns
+        return self._columns_
+
+    @property
+    def genSQL(self):
+        return self._source_.genSQL
+
+
 class SQLJoinTransform(SQLTransform):
     def __init__(self, source1, source2, src1joincols, src2joincols, join, suffix):
         super().__init__(None);

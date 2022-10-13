@@ -13,16 +13,18 @@ def estimate_join_card(card1, card2, null1, null2, distinct1, distinct2):
     @param distinct2:
     @return:
     """
+    print(f'distinct1={distinct1}, distinct2={distinct2}, card1={card1}, card2={card2}')
     rho = (1-null1)*(1-null2)*min(1/distinct1, 1/distinct2)
     card = card1*card2*rho
     return card
 
 
 class Node:
-    def __init__(self, val='', children=None, tbname=None):
+    def __init__(self, val='', children=None, tbname=None, jcost=0):
         self.val = val
         self.tbname = tbname
         self.children = children if children else [None, None]
+        self.jcost = jcost
 
     def add_child(self, child: Node, index=0):
         self.children[index] = child
@@ -38,5 +40,5 @@ class Node:
         r_child_lines = map(formatter, r_child.splitlines())
         l_child_lines = '\n'.join(l_child_lines)
         r_child_lines = '\n'.join(r_child_lines)
-        s = self.val+':\n'+l_child_lines+'\n'+r_child_lines
+        s = self.val+f'({self.jcost})'+':\n'+l_child_lines+'\n'+r_child_lines
         return s

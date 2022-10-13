@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import time
 
 import numpy as np
 import pandas
@@ -49,13 +50,13 @@ class PostgreDataSource(DataSource):
         return self._execute(qry).get_result_ls()
 
     def import_table(self, table: str, cols: dict, data):
-        # todo: allow to specify the columns to be inserted, maybe also create a col object for cols
         # todo: right now data iterate rows, rooms for optimization later
         import time
         start = time.time()
         column_name = ', '.join(list(cols.keys()))
         data_len = 0
         width = 0
+        print(f'data to be loaded {data}')
         with self.__cursor.copy(ql.copy_data(table, column_name)) as copy:
             for row in generator(data):
                 width = len(row)
@@ -125,21 +126,25 @@ class PostgreDataSource(DataSource):
         rs = self._execute(qry)
         return rs.get_value()
 
-    def _execute(self, qry) -> ResultSet | None:
-        self.__cursor.execute(qry)
-        if self.__cursor.description is not None:
-            # as no record returned for insert, update queries
-            # todo: change column type here
-            rs = ResultSet(self.__cursor.description, self.__cursor.fetchall())
-            return rs
-        return None
+    # def _execute(self, qry) -> ResultSet | None:
+    #     start = time.time()
+    #     self.__cursor.execute(qry)
+    #     if self.__cursor.description is not None:
+    #         # as no record returned for insert, update queries
+    #         # todo: change column type here
+    #         rs = ResultSet(self.__cursor.description, self.__cursor.fetchall())
+    #         print(f'query takes time {time.time()-start}')
+    #         return rs
+    #     return None
 
     def _execute(self, qry, *args) -> ResultSet | None:
+        start = time.time()
         self.__cursor.execute(qry, args)
         if self.__cursor.description is not None:
             # as no record returned for insert, update queries
             # todo: change column type here
             rs = ResultSet(self.__cursor.description, self.__cursor.fetchall())
+            print(f'query takes time {time.time() - start}')
             return rs
         self.__conn.commit()
         return None
