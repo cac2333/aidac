@@ -8,12 +8,12 @@ class Histgram:
 
 
 class MetaInfo:
-    def __init__(self, cols=None, cwidth=0, nrows=0):
+    def __init__(self, cols=None, nrows=0, cwidth=0, cmetas={}):
         if cols is None:
             cols = []
 
         self.cols = cols
         self.cwidth = cwidth
         self.nrows = nrows
-        self.null = 0
-        self.cmetas = {}
+        self.cmetas = cmetas
+        self.to_size = cwidth*nrows

@@ -60,6 +60,9 @@ class Scheduler:
                     from aidac.common.aidac_types import ArrayLike
                     if not is_type(sources, ArrayLike):
                         stack.append(sources)
+                    elif isinstance(cur.transform, SQLProjectionTransform):
+                        # todo: right now only consider homogenous project, heterogeneous ds to be added
+                        stack.append(sources[0])
                     else:
                         sblock = ScheduleExecutable(weakref.proxy(cur), ex1)
                         for s in sources:

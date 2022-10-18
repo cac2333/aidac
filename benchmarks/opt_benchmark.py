@@ -167,11 +167,13 @@ def q_03_v1(locs, remotes):
 
 def q_10_v1(locs, remotes):
     sqls = {
+        # 57069 * 2
         'orders': """SELECT o_orderkey, o_custkey FROM orders WHERE o_orderdate >= date \'1993-10-01\'
                 and o_orderdate < date \'1994-01-01\'""",
         'customer': """
             SELECT c_custkey, c_nationkey, c_name, c_acctbal, c_address, c_phone, c_comment FROM customer
         """,
+        # 1478870 * 2
         'lineitem': """
             SELECT l_extendedprice * (1 - l_discount) as revenue, l_orderkey FROM lineitem WHERE l_returnflag = 'R'
         """,
@@ -199,13 +201,29 @@ def q_10_v1(locs, remotes):
     if 'nation' in locs:
         n = n[['n_name', 'n_nationkey']]
 
+    # 57069 * 156w
     t = c.merge(o, left_on='c_custkey', right_on='o_custkey')
+
+    # 114705 * 192w
     t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey')
     t = t.merge(n, left_on='c_nationkey', right_on='n_nationkey')
     t = t[['c_custkey', 'c_name', 'c_acctbal', 'c_phone', 'n_name', 'c_address', 'c_comment', 'revenue']]
+
+    # 37967 * 244w
     t = t.groupby(['c_custkey', 'c_name', 'c_acctbal', 'c_phone', 'n_name', 'c_address', 'c_comment']).agg({'revenue': 'sum'})
     t.sort_values('revenue', ascending=False)
     return t
+
+
+def q_10_v2(locs, remotes):
+    sql1 = """
+    select o_orderkey, o_custkey, c_custkey, c_nationkey, c_name, c_acctbal, c_address, c_phone, c_comment, 
+    l_extendedprice * (1-l_discount) as revenue, l_orderkey 
+    from orders, customer, lineitem where l_returnflag='R' 
+    and o_orderdate >= date '1993-10-01' 
+    and o_orderdate < date '1994-01-01' and c_custkey = o_custkey 
+    and o_orderkey = l_orderkey
+    """
 
 
 def q_13_v1(locs, remotes):

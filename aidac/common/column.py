@@ -34,6 +34,12 @@ class Column:
             return sizes[self.dtype]
         return 4
 
+    def __str__(self):
+        str = f'Column {self.name}: <type={self.dtype},' \
+              f' table={self.tablename}, srccol={self.srccol}, ' \
+              f'db_table={self.source_table}, agg={self.agg_func}, expr={self.column_expr}>'
+        return str
+
 def get_size(tp):
     if tp and tp in sizes:
         return sizes[tp]

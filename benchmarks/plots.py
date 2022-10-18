@@ -1,6 +1,7 @@
 import csv
 
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 hm = {
     'id': 0,
@@ -30,7 +31,8 @@ def plot_1_result(qry_name, records):
 
     for ax, rec in zip(axes, records):
         values = [float(rec[name+'_time']) if rec[name+'_time'] else 0 for name in names]
-        ax.bar(names, values, color=colors)
+        # ax.bar(names, values, color=colors)
+        sns.barplot(data=values, ax=ax)
 
         if left_most:
             ax.set_ylabel('Seconds')
