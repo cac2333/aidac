@@ -4,7 +4,8 @@ from collections.abc import Iterable
 import numpy as np
 
 type_map = {
-    "date": "datetime64[D]"
+    "date": "datetime64[D]",
+    np.datetime64: "datetime64[D]"
 }
 
 class ResultSet:
@@ -85,6 +86,7 @@ class ResultSet:
         if not self.data:
             return od
 
+        # todo: got datetime, need datetime64 (from tracked_cols)?
         for idx1, col_name in enumerate(tracked_cols):
             # tp = type(self.data[0][idx1])
             col = tracked_cols[col_name]

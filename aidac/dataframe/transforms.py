@@ -135,7 +135,7 @@ class SQLTransform(Transform):
             raise AttributeError("Cannot locate column {} from {}".format(srccol, table_name))
         else:
             srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])
-            sdbtables += (scol.tablename if (isinstance(scol.tablename, list)) else [scol.tablename])
+            sdbtables = scol.tablename
             srcol_db = scol.source_table
 
         column = Column(projcoln, scol.dtype)
@@ -143,7 +143,11 @@ class SQLTransform(Transform):
         column.tablename = sdbtables
         column.column_expr = coltransform
         column.source_table = srcol_db
+        column.null_frac = scol.null_frac
+        column.avg_size = scol.avg_size
+        column.n_distinct = scol.n_distinct
         return column
+
 
 class SQLAggregateTransform(SQLTransform):
     def __init__(self, source, projcols, groupcols):
@@ -399,8 +403,8 @@ class SQLJoinTransform(SQLTransform):
                 projcols = sourcecols;
                 projcolumns = list();
                 for c in projcols.values():
-                    if (isinstance(self._src1joincols_,
-                                   str) and c.name == self._src1joincols_ and c.name == self._src2joincols_) \
+                    if (isinstance(self._src1joincols_, str)
+                        and c.name == self._src1joincols_ and c.name == self._src2joincols_) \
                             or (isinstance(self._src1joincols_,
                                            list) and c.name in self._src1joincols_ and c.name in self._src2joincols_):
                         # if the name is common in two columns, we give it a suffix
@@ -429,6 +433,7 @@ class SQLJoinTransform(SQLTransform):
         projcoltxt = None;
         for c in self.columns:  # Prepare the list of columns going into the select statement.
             col = self.columns[c]
+            print(col.tablename)
             projcoltxt = ((projcoltxt + ', ') if projcoltxt else '') + (
                         col.tablename + '.' + col.srccol[0] + ' AS ' + col.name)
 
@@ -523,12 +528,6 @@ class SQLOrderTransform(SQLTransform):
         self._ascending_ = ascending
     def _gen_column(self, source):
         pass
-
-    #   df.order(by = ...)
-
-    #
-    # def execute_source(self):
-    #     pass
 
     @property
     def columns(self):
@@ -864,7 +863,7 @@ class SQLDropduplicateTransform(SQLTransform):
 
     def _gen_column(self, source):
         self._columns_ = self._source_.columns
-        print(self._columns_)
+        # print(self._columns_)
 
 
 class SQLISNA(SQLTransform):
@@ -948,7 +947,7 @@ class SQLFilterTransform(SQLTransform):
         return isinstance(o, str)
 
     def is_float(self, o):
-        return isinstance(o, float)
+        return "float" in str(o)
 
     def is_date_time(self, o):
         return isinstance(o, datetime.date) or isinstance(o, np.datetime64)

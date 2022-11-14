@@ -69,6 +69,9 @@ class DataSource:
     def get_estimation(self, qry):
         pass
 
+    def table_exists(self, table: str):
+        pass
+
 
 class LocalDataSource(DataSource):
     def __init__(self):

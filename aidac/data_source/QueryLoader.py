@@ -67,5 +67,17 @@ class QueryLoader:
     def drop_estimation_func(self):
         return self.load_query('drop_estimate_size')
 
+    def table_exists(self, table):
+        return self.load_query('table_exists').format(table)
+
     def get_estimation(self, qry):
         return self.load_query('estimate_size').format(qry)
+
+    def create_sampled_column_size(self):
+        return self.load_query('sampled_column_size_func')
+
+    def create_table_column_meta(self):
+        return self.load_query('table_column_meta_func')
+
+    def table_column_meta(self, table, limit):
+        return self.load_query('table_column_meta').format(table, limit)

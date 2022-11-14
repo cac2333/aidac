@@ -7,6 +7,7 @@ import typing
 ConstantTypes = Union[str, float, int, bool, np.int, np.float, datetime.date, datetime.datetime, datetime.timedelta, np.datetime64]
 ArrayLike = Union[np.ndarray, list, tuple]
 NumericTypes = Union[float, int, np.int, np.float]
+FloatType = Union[float, np.float, np.float64, np.float32]
 
 
 def is_type(value, expected) -> bool:

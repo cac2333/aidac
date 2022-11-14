@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import time
+from collections import OrderedDict
 
 import numpy as np
 import pandas
@@ -11,6 +12,7 @@ from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource
 from aidac.data_source.QueryLoader import QueryLoader
 import psycopg
+from psycopg import sql
 
 from aidac.data_source.ResultSet import ResultSet
 
@@ -32,6 +34,12 @@ typeConverter_rev = {'integer': np.int32, 'character varying': np.object, 'doubl
 constant_converter = {'YES': True, 'NO': False}
 
 
+def convert_const(key):
+    if key in constant_converter:
+        return constant_converter[key]
+    return key
+
+
 class PostgreDataSource(DataSource):
     def connect(self):
         self.port = 5432 if self.port is None else self.port
@@ -44,6 +52,13 @@ class PostgreDataSource(DataSource):
             password={}""".format(self.host, self.port, self.dbname, self.username, self.password)
         )
         self.__cursor = self.__conn.cursor()
+        self._bootstrap()
+
+    def _bootstrap(self):
+        # preload all the session temporary functions
+        # qry = ql.create_sampled_column_size()
+        qry = ql.create_table_column_meta()
+        self._execute(qry)
 
     def ls_tables(self):
         qry = ql.list_tables()
@@ -56,7 +71,7 @@ class PostgreDataSource(DataSource):
         column_name = ', '.join(list(cols.keys()))
         data_len = 0
         width = 0
-        print(f'data to be loaded {data}')
+        # print(f'data to be loaded {data}')
         with self.__cursor.copy(ql.copy_data(table, column_name)) as copy:
             for row in generator(data):
                 width = len(row)
@@ -65,13 +80,23 @@ class PostgreDataSource(DataSource):
         print('loading data time: '+str(start-time.time()))
         print(f'imported data size {data_len*width}')
 
-
     def table_columns(self, table: str):
-        qry = ql.table_columns(table)
-        rs = self._execute(qry)
+        qry = ql.table_column_meta(table, 200)
+        print(qry)
+        rs = self._execute(qry).data
         # expected return value from pg:
-        # returned value: schemaname, tablename, columnname, columntype, columnsize, columnpos, nullable
-        cols = [Column(x[2], typeConverter_rev[x[3]], x[1], x[0], constant_converter[x[-1]], x[2], source_table=x[1]) for x in rs.data]
+        # returned value: cname text,
+        #                  is_nullable bool,
+        #                  data_type text,
+        #                 max_val numeric,
+        #                 avg_len numeric, null_frac numeric, n_distinct numeric
+        cols = []
+        for x in rs:
+            col = Column(name=x[0], table=table,
+                       dtype=typeConverter_rev[x[2]], nullable=convert_const(x[1]),
+                       source_table=table, avg_size=float(x[4]), max_val=x[3],
+                         null_frac=float(x[5]), n_distinct=float(x[6]))
+            cols.append(col)
         return cols
 
     def row_count(self, table: str):
@@ -116,7 +141,8 @@ class PostgreDataSource(DataSource):
         val = rs.get_value()
         table_name, null_frac, n_distinct, mcv = val if val else (table_name, 0, 1, [])
         # need to calculate the actual distinct values
-        n_distinct = self.row_count(table_name) * (-n_distinct)
+        # todo: double check the format of n_distinct
+        # n_distinct = self.row_count(table_name) * (-n_distinct)
         return table_name, null_frac, n_distinct, mcv
 
     def get_estimation(self, qry):
@@ -126,16 +152,11 @@ class PostgreDataSource(DataSource):
         rs = self._execute(qry)
         return rs.get_value()
 
-    # def _execute(self, qry) -> ResultSet | None:
-    #     start = time.time()
-    #     self.__cursor.execute(qry)
-    #     if self.__cursor.description is not None:
-    #         # as no record returned for insert, update queries
-    #         # todo: change column type here
-    #         rs = ResultSet(self.__cursor.description, self.__cursor.fetchall())
-    #         print(f'query takes time {time.time()-start}')
-    #         return rs
-    #     return None
+    def table_exists(self, table: str):
+        qry = ql.table_exists(table)
+        r = self._execute(qry).get_value()
+        print(f'table exist = {r}')
+        return r
 
     def _execute(self, qry, *args) -> ResultSet | None:
         start = time.time()
@@ -144,7 +165,7 @@ class PostgreDataSource(DataSource):
             # as no record returned for insert, update queries
             # todo: change column type here
             rs = ResultSet(self.__cursor.description, self.__cursor.fetchall())
-            print(f'query takes time {time.time() - start}')
+            # print(f'query takes time {time.time() - start}')
             return rs
         self.__conn.commit()
         return None

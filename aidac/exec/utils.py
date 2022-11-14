@@ -4,6 +4,8 @@ from __future__ import annotations
 def estimate_join_card(card1, card2, null1, null2, distinct1, distinct2):
     """
     selectivity = (1-null1)*(1-null2)*min(1/distinct1, 1/distinct2)
+    choosing the table with bigger distinct number (smaller 1/distinct) as the inner table is to
+    make for every tuple in the outer table, there is a match in the inner table
     (selectivity for each possible value of the inner (big) table)
     card = card1*card2*selectivity
     @param card1:
@@ -13,7 +15,7 @@ def estimate_join_card(card1, card2, null1, null2, distinct1, distinct2):
     @param distinct2:
     @return:
     """
-    print(f'distinct1={distinct1}, distinct2={distinct2}, card1={card1}, card2={card2}')
+    # print(f'distinct1={distinct1}, distinct2={distinct2}, card1={card1}, card2={card2}')
     rho = (1-null1)*(1-null2)*min(1/distinct1, 1/distinct2)
     card = card1*card2*rho
     return card

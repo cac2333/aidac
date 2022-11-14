@@ -262,8 +262,8 @@ my_db = Database(db_config['host'], db_config['schema'], db_config['db'], db_con
 
 if __name__ == '__main__':
     full_qry = ['mini_01', 'mini_02', 'mini_03', 'mini_05', 'mini_06', 'q_03_v1', 'q_10_v1', 'q_13_v1']
-    qrys = ['mini_03']
-    for q in full_qry:
+    qrys = ['q_14_v1', 'q_15_v1']
+    for q in qrys:
         try:
             for ls, rs in table_dist[q]:
                 print('----------------------------------------------\n'

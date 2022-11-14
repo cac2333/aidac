@@ -127,7 +127,7 @@ def mini_05(locs, remotes):
 def mini_06(locs, remotes):
     start = time.time()
     tbs = read_tables(locs, remotes)
-    print(f'*******read tables={time.time()-start}**********')
+    # print(f'*******read tables={time.time()-start}**********')
     p = tbs['part']
     p = p[(p['p_size'] == 15)]
     if 'part' in locs:
@@ -311,14 +311,26 @@ def q_15_v1(locs, remotes):
     t = t.merge(ti, left_on='p_partkey', right_on='p_partkey')
     t = t[t['l_quantity'] < t['avg_qty']]
     t.materialize()
+    print(t.data)
     t = t[['l_extendedprice']]
     t = t.sum()
     return t
+
+def random_01(locs, remotes):
+    tbs = read_tables(locs, remotes)
+    customer = tbs['customer']
+    nation = tbs['nation']
+    df5 = customer[(customer['C_ACCTBAL'] >= 759) | (customer['C_CUSTKEY'] >= 24)][
+        ['C_NAME', 'C_NATIONKEY', 'C_PHONE', 'C_ACCTBAL', 'C_MKTSEGMENT', 'C_COMMENT']].groupby(by=['C_ACCTBAL']).agg(
+        'mean').merge(nation[nation['N_REGIONKEY'] >= 3][['N_NATIONKEY', 'N_REGIONKEY']],
+                                         left_on='C_NATIONKEY', right_on='N_NATIONKEY')
+    return df5
 
 def measure_time(func, *args):
     start = time.time()
     rs = func(*args)
     # print('func called')
+    print(rs.genSQL)
     rs.materialize()
     # print('materialized')
     end = time.time()
@@ -330,7 +342,7 @@ if __name__ == '__main__':
     connect(db_config['host'], db_config['schema'], db_config['db'], db_config['port'], db_config['user'],
                  db_config['passwd'])
     full_qry = ['mini_03', 'mini_05', 'mini_06', 'q_03_v1', 'q_10_v1', 'q_13_v1']
-    qrys = ['mini_06']
+    qrys = ['q_14_v1', 'q_15_v1']
     for q in qrys:
         for ls, rs in table_dist[q]:
             try:

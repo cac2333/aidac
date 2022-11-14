@@ -75,7 +75,7 @@ class Scheduler:
         root_ex = RootExecutable()
         root_ex.add_prereq(ex)
         my_plan = root_ex.plan()
-        print(my_plan)
+        print(f'selected plan: \n{my_plan}')
         print(f'planning takes time {time.time()-start}')
         return root_ex.process()
 

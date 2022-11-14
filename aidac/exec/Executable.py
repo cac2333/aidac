@@ -54,6 +54,8 @@ def get_hist(df: frame.DataFrame, col: str):
     else:
         while df.transform is not None:
             df = df.transform.sources()
+            if is_type(df, ArrayLike):
+                df = df[0]
         table_name, null_frac, n_distinct, mcv = df.data_source.get_hist(df.table_name, col)
         hist = Histgram(table_name, null_frac, n_distinct, mcv, col)
     return hist
@@ -103,7 +105,7 @@ class Executable:
             return True
         if df.transform is not None:
             # as each executable only get to join operations
-            if isinstance(df.transform.sources(), tuple):
+            if is_type(df.transform.sources(), ArrayLike):
                 for src in df.transform.sources():
                     if not self.to_be_executed_locally(src):
                         return False
@@ -118,7 +120,7 @@ class Executable:
         sources = df.transform.sources()
 
         # todo: do we also want to save the intermediate results?
-        if isinstance(sources, tuple):
+        if is_type(sources, ArrayLike):
             data1 = self.perform_local_operation(sources[0])
             data2 = self.perform_local_operation(sources[1])
             if len(data1) == 0 or len(data2)==0:
@@ -153,13 +155,13 @@ class Executable:
         for x in self.prereqs:
             x.process()
 
-        print('process, planned job={}'.format(self.planned_job))
+        # print('process, planned job={}'.format(self.planned_job))
         start = time.time()
         if self.planned_job == LOCAL_DS:
             # local pandas operation
             assert self.to_be_executed_locally(self.df)
             data = self.perform_local_operation(self.df)
-            print(f'pandas takes time: {time.time()-start}')
+            # print(f'pandas takes time: {time.time()-start}')
         else:
             # materialize remote table
 
@@ -168,9 +170,7 @@ class Executable:
             ds = manager.get_data_source(self.planned_job)
             print('***************\n'+sql+'\n++**********')
             expl = 'explain analyze ('+sql+')'
-            rs = ds._execute(expl)
-            print('***************explain****************')
-            print(rs.data)
+            # rs = ds._execute(expl)
 
             rs = ds._execute(sql)
 
@@ -178,7 +178,9 @@ class Executable:
             data = rs.to_tb(self.df.columns)
             # get result table and convert to dataframe
             print('sql time = {}, conversion time = {}, total={}'.format(returned-start, time.time()-returned, time.time()-start))
-            data = pd.DataFrame(data)
+            #todo: q10_v1 local: orders
+            # SystemError: <built-in function ensure_datetime64ns> returned a result with an error set
+            data = pd.DataFrame(data, columns=self.df.columns.keys())
         self.clear_lineage()
         self.df._data_ = data
         from aidac.data_source.DataSource import local_ds
@@ -210,7 +212,6 @@ class Executable:
         trans = self.df.transform
         cols = []
         while trans is not None and not is_type(trans, SQLJoinTransform):
-            print(trans)
             if isinstance(trans, SQLFilterTransform):
                 cols += list(trans.columns.keys())
             elif isinstance(trans, SQLGroupByTransform):
@@ -251,7 +252,6 @@ class Executable:
                 meta = self._local_card_estimate(jn_cols)
             else:
                 # as we have no prereqs, all data has to be in the same database. Thus we can directly use genSQL
-                print(self.df)
                 est_row, est_width = \
                     self.df.data_source.get_estimation(self.df.genSQL)
                 col_meta = self._get_col_meta(jn_cols)
@@ -292,9 +292,9 @@ class TransferExecutable(Executable):
         if dest != LOCAL_DS:
             start = time.time()
             dest_ds = manager.get_data_source(dest)
-            dest_ds.create_table(src.table_name, scols)
-            dest_ds.import_table(src.table_name, scols, src.data)
-            print('transfer takes time {}'.format(start-time.time()))
+            if not dest_ds.table_exists(src.table_name):
+                dest_ds.create_table(src.table_name, scols)
+                dest_ds.import_table(src.table_name, scols, src.data)
         # todo: decide if a local stub should be created
 
     def removable(self):
@@ -388,7 +388,8 @@ class RootExecutable(Executable):
         # only need to insert transfer block when other schedule executables are involved
         if all_path:
             all_path = self._wrap_return_cost(all_path)
-            self._print_all_path(all_path)
+            # self._print_all_path(all_path)
+            # print(f'number of plans: {len(all_path)}')
             path, lowest = self._get_lowest_cost_path(all_path)
             self._insert_transfer_block(self, path)
             self.pre_process()
@@ -436,9 +437,9 @@ class ScheduleExecutable(Executable):
         all_ds = manager.all_data_sources()
         for ds in all_ds:
             for c1, p1 in plan1:
-                cur_c1 = 0 if ds == p1.val else block1.estimated_meta.to_size
+                cur_c1 = c1 if ds == p1.val else block1.estimated_meta.to_size + c1
                 for c2, p2 in plan2:
-                    cur_c2 = 0 if ds == p2.val else block2.estimated_meta.to_size
+                    cur_c2 = c2 if ds == p2.val else block2.estimated_meta.to_size + c2
                     new_path = Node(ds, [p1, p2], str(self.prev))
                     new_cost = cur_c2 + cur_c1
                     all_plans.append((new_cost, new_path))
@@ -495,9 +496,8 @@ class ScheduleExecutable(Executable):
         est_width = 0
 
         cmetas = {}
+        est_width = tbl1.estimated_meta.cwidth + tbl2.estimated_meta.cwidth
         for c in self.prev.columns:
-            col = self.prev.columns[c]
-            est_width += col.get_size()
             if c in tbl1.estimated_meta.cmetas:
                 cmetas[c] = tbl1.estimated_meta.cmetas[c]
             elif c in tbl2.estimated_meta.cmetas:
@@ -518,13 +518,18 @@ class ScheduleExecutable(Executable):
         # choose the column with the largest distinct value to work with
         distinct1, distinct2 = 0, 0
 
+        # distinct can be negative ratio or positive number:
+        # todo: move to data source?
+        def convert_distinct(dn, rn):
+            return -dn * rn if dn < 0 else dn
+
         for jc1, jc2 in trans.join_cols:
             # mismatch distinct values do not matter for now as we only use the biggest value
             if jc1 in meta1.cmetas and jc2 in meta2.cmetas:
                 d1 = meta1.cmetas[jc1].n_distinct
-                distinct1 = d1 if d1 > distinct1 else distinct1
+                distinct1 = convert_distinct(d1, meta1.nrows)
                 d2 = meta2.cmetas[jc2].n_distinct
-                distinct2 = d2 if d2 > distinct2 else distinct2
+                distinct2 = convert_distinct(d2, meta2.nrows)
 
         if distinct1 == 0:
             distinct1 = meta1.nrows
