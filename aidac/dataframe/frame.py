@@ -66,7 +66,7 @@ def binary_op_local_frame_wrapper(func):
         df = func(self, other)
         df.source_table = self.source_table
         df._saved_func_name_ = func_name
-        df._saved_args_ = other
+        df._saved_args_ = [other]
         return df
     return inner
 
@@ -183,6 +183,8 @@ class DataFrame:
     def clear_lineage(self):
         del self._transform_
         self._transform_ = None
+        self._saved_args_ = []
+        self._saved_kwargs_ = {}
 
     def set_ds(self, ds):
         self._ds_ = ds
@@ -267,7 +269,8 @@ class DataFrame:
             tb = DataFrame(data=rs, ds=local_ds)
         else:
             func_name = 'merge'
-            saved_args = {'on': on, 'how': how, 'left_on': left_on, 'right_on': right_on,
+            saved_args = [other]
+            saved_kargs = {'on': on, 'how': how, 'left_on': left_on, 'right_on': right_on,
                           'suffixes': suffixes, 'sort': sort}
             if left_on and right_on:
                 trans = SQLJoinTransform(self, other, left_on, right_on, how, suffixes)
@@ -276,7 +279,8 @@ class DataFrame:
 
             tb = DataFrame(transform=trans)
             tb._saved_func_name_ = func_name
-            tb._saved_kwargs_ = saved_args
+            tb._saved_args_ = saved_args
+            tb._saved_kwargs_ = saved_kargs
         return tb
 
     @local_frame_wrapper
@@ -331,9 +335,9 @@ class DataFrame:
         trans = SQLAGG_Transform(self, func=func, collist=collist)
         return DataFrame(ds=self.data_source, transform=trans)
 
-    def isin(self, values: list):
-        # todo: check contents in values
-        trans = SQLFilterTransform(self, 'isin', values)
+    # def isin(self, values: list):
+    #     # todo: check contents in values
+    #     trans = SQLFilterTransform(self, 'isin', values)
 
     @local_frame_wrapper
     def head(self, n=5):
@@ -628,7 +632,7 @@ class DataFrame:
         # validate the input having the correct size
         self._validate_input_column_size(key, val)
 
-        all_cols = self.columns
+        all_cols = copy.deepcopy(self.columns)
 
         # check the type of val and create corresponding column object
         if is_type(key, ArrayLike):
@@ -660,22 +664,9 @@ class DataFrame:
                 return self._handle_assign_locally(key, val)
 
         trans = SQLProjectionTransform(self, all_cols)
+        trans._columns_ = all_cols
         tb = DataFrame(transform=trans, ds=self.data_source)
+        tb._saved_func_name_ = '__setitem__'
+        tb._saved_args_ = [key, val]
         return tb
-
-
-class RemoteTable(DataFrame):
-    def __init__(self, source: DataSource = None, transform: Transform = None, table_name: str = None):
-        super().__init__(table_name)
-        self._ds_ = source
-        self.source_table = table_name
-
-        # try retrieve the meta info of the table from data source
-        # if table does not exist, an error will occur
-        self._link_table_meta()
-
-        self._transform_ = transform
-        self._data_ = None
-        self.other_ds = []
-
 

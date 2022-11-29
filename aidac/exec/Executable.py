@@ -112,6 +112,9 @@ class Executable:
             else:
                 return self.to_be_executed_locally(df.transform.sources())
         return True
+
+    def _invoke_pd(self, df):
+        pass
     
     def perform_local_operation(self, df):
         if df.data is not None:
@@ -138,10 +141,18 @@ class Executable:
             # print(df._saved_args_)
             # print(data.columns)
             # todo: projection list saved args
-            if isinstance(df.transform, SQLProjectionTransform):
-                data = func(df._saved_args_, **df._saved_kwargs_)
-            else:
-                data = func(*df._saved_args_, **df._saved_kwargs_)
+            # if isinstance(df.transform, SQLProjectionTransform):
+            #     data = func(df._saved_args_, **df._saved_kwargs_)
+            # else:
+            for idx, arg in enumerate(df._saved_args_):
+                from aidac.dataframe.frame import DataFrame
+                if isinstance(arg, DataFrame):
+                    # todo: happens only at project. Based on current impl, this has to be local
+                    df._saved_args_[idx] = self.perform_local_operation(arg)
+
+            # in case the function does not return a new dataframe (imply it change the old df in place), we return the old data
+            new_data = func(*df._saved_args_, **df._saved_kwargs_)
+            data = new_data if new_data is not None else data
         return data
 
     def process(self):
@@ -224,6 +235,12 @@ class Executable:
         return cols
 
     def _my_estimation(self):
+        """
+        estimate the row number by inherit prereq's row
+        estimate column meta by recompute the column width use stored column information
+        # todo: update n_distinct meta and recompute row number as well
+        @return:
+        """
         pre_meta = self.prereqs[0].estimated_meta
         est_width = _estimate_col_width(self.df)
         est_row = pre_meta.nrows
@@ -234,6 +251,7 @@ class Executable:
         return MetaInfo(self.df.columns, est_row, est_width, cmetas)
 
     def plan(self, jn_cols=[]):
+        # avoid repeat plan
         if self.plans:
             return self.plans
         all_paths = []
@@ -241,7 +259,7 @@ class Executable:
         if self.prereqs:
             # collection all filter and groupby columns in this execution block
             collected_cols = self._collect_fg_cols()
-            # there should be at most one prereq block
+            # there should be at most one prereq block, otherwise it wouldn't be a base block
             x = self.prereqs[0]
             all_paths.extend(x.plan(collected_cols + jn_cols))
             meta = self._my_estimation()
@@ -252,6 +270,8 @@ class Executable:
                 meta = self._local_card_estimate(jn_cols)
             else:
                 # as we have no prereqs, all data has to be in the same database. Thus we can directly use genSQL
+                if self.df.data_source is None:
+                    print(f'{self.df} has None datasource')
                 est_row, est_width = \
                     self.df.data_source.get_estimation(self.df.genSQL)
                 col_meta = self._get_col_meta(jn_cols)

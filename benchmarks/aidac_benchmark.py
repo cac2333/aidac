@@ -287,7 +287,8 @@ def q_14_v1(locs, remotes):
     t = t.groupby('revenue2').agg({'revenue2': ['sum'], 'revenue1': ['sum']})
     t = 100 * t['revenue1'] / t['revenue2']
     # t = pd.DataFrame({'promo_revenue': [t]})
-    return t;
+    return t
+
 
 def q_15_v1(locs, remotes):
     tbs = read_tables(locs, remotes)
@@ -316,15 +317,26 @@ def q_15_v1(locs, remotes):
     t = t.sum()
     return t
 
+
 def random_01(locs, remotes):
     tbs = read_tables(locs, remotes)
-    customer = tbs['customer']
-    nation = tbs['nation']
-    df5 = customer[(customer['C_ACCTBAL'] >= 759) | (customer['C_CUSTKEY'] >= 24)][
-        ['C_NAME', 'C_NATIONKEY', 'C_PHONE', 'C_ACCTBAL', 'C_MKTSEGMENT', 'C_COMMENT']].groupby(by=['C_ACCTBAL']).agg(
-        'mean').merge(nation[nation['N_REGIONKEY'] >= 3][['N_NATIONKEY', 'N_REGIONKEY']],
-                                         left_on='C_NATIONKEY', right_on='N_NATIONKEY')
-    return df5
+    partsupp = tbs['partsupp']
+    lineitem = tbs['lineitem']
+    supplier = tbs['supplier']
+    df1112 = partsupp[partsupp['ps_supplycost'] >= 863].merge(
+        lineitem[(lineitem['l_suppkey'] <= 6543) | (lineitem['l_quantity'] <= 43)].merge(
+            partsupp[partsupp['ps_supplycost'] >= 149].merge(
+                supplier[(supplier['s_nationkey'] >= 0) | (supplier['s_acctbal'] >= 2154)], left_on='ps_suppkey',
+                right_on='s_suppkey'), left_on='l_suppkey', right_on='s_suppkey'), left_on='ps_suppkey',
+        right_on='s_suppkey')
+    df1113 = partsupp[partsupp['ps_supplycost'] >= 863].merge(
+        lineitem[(lineitem['l_suppkey'] <= 6543) | (lineitem['l_quantity'] <= 43)].merge(
+            partsupp[partsupp['ps_supplycost'] >= 149].merge(
+                supplier[(supplier['s_nationkey'] < 19) | (supplier['s_acctbal'] < 11581)][['s_suppkey', 's_phone']],
+                left_on='ps_suppkey', right_on='s_suppkey'), left_on='l_suppkey', right_on='s_suppkey'),
+        left_on='ps_suppkey', right_on='s_suppkey')
+    return df1113
+
 
 def measure_time(func, *args):
     start = time.time()
@@ -342,7 +354,7 @@ if __name__ == '__main__':
     connect(db_config['host'], db_config['schema'], db_config['db'], db_config['port'], db_config['user'],
                  db_config['passwd'])
     full_qry = ['mini_03', 'mini_05', 'mini_06', 'q_03_v1', 'q_10_v1', 'q_13_v1']
-    qrys = ['q_14_v1', 'q_15_v1']
+    qrys = ['q_14_v1']
     for q in qrys:
         for ls, rs in table_dist[q]:
             try:
