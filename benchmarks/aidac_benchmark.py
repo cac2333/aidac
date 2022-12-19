@@ -353,9 +353,9 @@ def measure_time(func, *args):
 if __name__ == '__main__':
     connect(db_config['host'], db_config['schema'], db_config['db'], db_config['port'], db_config['user'],
                  db_config['passwd'])
-    full_qry = ['mini_03', 'mini_05', 'mini_06', 'q_03_v1', 'q_10_v1', 'q_13_v1']
-    qrys = ['q_14_v1']
-    for q in qrys:
+    full_qry = ['mini_03', 'mini_05', 'mini_06', 'q_03_v1', 'q_10_v1', 'q_13_v1', 'q_14_v1']
+    qrys = ['q_15_v1']
+    for q in full_qry:
         for ls, rs in table_dist[q]:
             try:
                 print('\n----------------------------------------------\n'

@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import numbers
 import re
+import typing
 import warnings
 from abc import abstractmethod
 import collections
@@ -15,6 +16,7 @@ from _distutils_hack import override
 
 from aidac.common.column import Column
 from aidac.data_source.DataSource import DataSource, local_ds
+from aidac.dataframe.lad_exceptions import ForceLocalExecutionWarning
 from aidac.dataframe.transforms import *
 from aidac.exec.Executable import Executable
 import pandas as pd
@@ -88,6 +90,7 @@ class DataFrame:
         self._saved_args_ = []
         self._saved_kwargs_ = {}
         self._db_persistent = db_persistent
+        self._force_local_ = False
 
         # self.str = None     #return DF
         '''
@@ -569,37 +572,59 @@ class DataFrame:
             if is_type(val, DataFrame) and len(val.columns) != 1:
                 raise ValueError('Assigned Dataframe has different column length')
 
-    def _handle_df_cols(self, key, val):
-        # todo: self source table is product of previous merge
-        one_table = True
+    def _is_direct_ancestor_of(self, other: DataFrame):
+        # check if the two from the same tree branch without filter, aggregation, or groupby in between
+        start = other
+        while start.transform is not None:
+            if is_type(start.transform, NON_PASS_TRANSFORM):
+                break
+            if start != self:
+                start = start.transform.sources()
+            else:
+                return True
+        return False
 
-        col = val
-        if col.source_table != self.source_table:
-            warnings.warn('Assigned column(s) from a different table. Data will be handled locally')
-            one_table = False
+    def _handle_df_cols(self, key, val_col:Column, val: DataFrame):
+        force_local = False
+        if self._is_direct_ancestor_of(val) or val._is_direct_ancestor_of(self):
+            new_col = Column(name=key, dtype=val_col.dtype, source_table=val_col.source_table)
+        else:
+            warnings.warn('assigned column from a different table', ForceLocalExecutionWarning)
+            force_local = True
+            new_col = Column(name=key, dtype=val_col.dtype, expr=val_col.column_expr)
+        return new_col, force_local
 
-        new_col = None
-
-        if one_table:
-            new_col = Column(key, col.dtype, table=col.tablename, transform=col.column_expr)
-
-        return new_col
-
-    def _format_column(self, key, val):
+    def _format_column(self, key, val) -> (Column, bool):
+        """
+        @param key: column key
+        @param val: constant value to be assigned
+        @return: new column object and a flag indicate if this column can be obtained remotely
+        """
+        force_local = False
         if is_type(val, ConstantTypes):
             new_col = Column(key, type(val))
             if is_type(val, NumericTypes):
                 new_col.column_expr = str(val)
             else:
                 new_col.column_expr = '\''+val+'\''
-            return new_col
+        elif is_type(val, ArrayLike):
+            # since db cannot guarantee an order
+            # we send out a warning to user that all operations involving this df have to be performed locally
+            warnings.warn(ForceLocalExecutionWarning)
+            new_col_type = val.dtype if hasattr(val, 'dtype') else object
+            new_col = Column(key, new_col_type)
+            force_local = False
+        else:
+            raise ValueError('Unsupported value type')
+        return new_col, force_local
+
 
     def _handle_assign_locally(self, key, val):
         self.materialize()
         vs = []
         if is_type(key, ArrayLike):
             for k, v in zip(key, val):
-                if hasattr(v,'materialize'):
+                if hasattr(v, 'materialize'):
                     vs.append(v.materialize())
                 else:
                     vs.append(v)
@@ -614,7 +639,7 @@ class DataFrame:
         """
         @param key: column name
         @param val: dataframe
-        @return:
+        @return: a new dataframe that has the original data and the new columns val with key as its column name
         """
         # If data is local, let pandas handle the rest
         # When data is remote, check if column length matches.
@@ -633,40 +658,42 @@ class DataFrame:
         self._validate_input_column_size(key, val)
 
         all_cols = copy.deepcopy(self.columns)
+        force_local = False
+
+        # save the original key value pair for saved args
+        okey, oval = key, val
+
+        if not is_type(key, ArrayLike):
+            key = [key]
+            val = val if isinstance(val, DataFrame) else [val]
 
         # check the type of val and create corresponding column object
-        if is_type(key, ArrayLike):
-            if not is_type(val, DataFrame):
-                for k, v in zip(key, val):
-                    const_col = self._format_column(k, v)
-                    if const_col:
-                        all_cols[k] = const_col
-            else:
-                # check the key and the df have the same column length
-                if len(key) != len(val.columns):
-                    raise ValueError('The data to be assigned must have the same dimension as the keys')
-                else:
-                    for k, v in zip(key, val.columns):
-                        new_col = self._handle_df_cols(k, v)
-                        if new_col:
-                            all_cols[k] = new_col
-                        else:
-                            return self._handle_assign_locally(key, val)
+        # for constant val, we format it and save it in the column expr
+        # for list type, we force local execution by setting the force_local flag
+        if not is_type(val, DataFrame):
+            assert isinstance(val, Iterable), "For a list of keys, the values to be assigned has to be iterable"
+            for k, v in zip(key, val):
+                all_cols[k], fl = self._format_column(k, v)
+                force_local = force_local | fl
         else:
-            # we only allow 1 column to be assigned to a new column for now
-            if len(val.columns) != 1:
+            # check the key and the df have the same column length
+            if len(key) != len(val.columns):
+                raise ValueError('The data to be assigned must have the same dimension as the keys')
+            elif len(val.columns) != 1:
                 raise ValueError('Can only assign dim-1 vector to a column')
-
-            new_col = self._handle_df_cols(key, list(val.columns.values())[0])
-            if new_col:
-                all_cols[key] = new_col
             else:
-                return self._handle_assign_locally(key, val)
+                for k, v in zip(key, val.columns):
+                    new_col, fl = self._handle_df_cols(k, v, val)
+                    all_cols[k] = new_col
+                    force_local = fl | force_local
+
+        if force_local:
+            return self._handle_assign_locally(key, val)
 
         trans = SQLProjectionTransform(self, all_cols)
         trans._columns_ = all_cols
         tb = DataFrame(transform=trans, ds=self.data_source)
         tb._saved_func_name_ = '__setitem__'
-        tb._saved_args_ = [key, val]
+        tb._saved_args_ = [okey, oval]
         return tb
 

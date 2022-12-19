@@ -4,6 +4,7 @@ import collections
 import copy
 import datetime
 import re
+import typing
 import weakref
 from collections.abc import Iterable
 from enum import Enum
@@ -21,7 +22,6 @@ JOIN_TYPE = {
     'right': 'RIGHT OUTER JOIN',
     'cross': 'CROSS JOIN'
 }
-
 
 class Transform:
     def transform_name(self):
@@ -223,9 +223,26 @@ class SQLBinaryOperationTransform(SQLTransform):
         super().__init__(source)
         self.op = op
         self._other_ = other
+        # corresponding expression for each column
+        self._col_expr_ = {}
         self._is_num_ = is_num
         self._reverse_ = reverse
+        self.temp_prefix = "column"
 
+    """
+    column prototype:
+    for each column, we need the current table name, the source database column if any
+    the column name, the column type, the column size, everything else can be stored with 
+    each specific transform
+    """
+
+
+    """
+    a binary operation create a new column, which has no name, so we assign a name to it temporally 
+    assume the operands are validated
+    we store the operation on table's column with the new column's column_expr (could be multiple)
+    If the previous operation is also binary, we concatenate them together in column's expr
+    """
     def _col_exp(self, col):
         col_exp = col.column_expr if col.column_expr else col.full_name()
         if self._is_num_:
@@ -252,13 +269,18 @@ class SQLBinaryOperationTransform(SQLTransform):
     @property
     def columns(self):
         if not self._columns_:
-            self._columns_ = super().columns
-            for col_name in self._columns_:
+            # if the source is a table, then we operate on its columns
+            # if the source is another binaryOperation, then
+            srccols = super().columns
+            self._columns_ = {}
+            for idx, col_name in enumerate(srccols):
                 # todo: update column name
-                col = self._columns_[col_name]
+                col = srccols[col_name]
                 # need to assign table name before column expression
                 col.column_expr = self._col_exp(col)
+                self._columns_[f'{self.temp_prefix}_{idx}'] = col
         return self._columns_
+
 
     def _partial_sql(self):
         return self._source_.genSQL
@@ -272,7 +294,7 @@ class SQLBinaryOperationTransform(SQLTransform):
                 col.column_expr) else col.srccol[0]) + ' AS ' + col.name)
 
         if hasattr(self._source_, 'transform') and isinstance(self._source_.transform, SQLBinaryOperationTransform):
-            # source table is used to provide proj column information, use source.source's sql
+            # source table is used to provide proj column information, use source.source's sql (src.transform.partial sql)
             return 'SELECT ' + projcoltxt + ' FROM (' + self._source_.transform._partial_sql() + ') ' + self._source_.table_name
         else:
             return 'SELECT ' + projcoltxt + ' FROM (' + self._source_.genSQL + ') ' + self._source_.table_name
@@ -1366,3 +1388,7 @@ class SQLAPPEND(SQLTransform):
     @property
     def genSQL(self):
         pass
+
+
+NON_PASS_TRANSFORM = typing.Union[SQLFilterTransform, SQLGroupByTransform,
+                                  SQLAggregateTransform, SQLJoinTransform]

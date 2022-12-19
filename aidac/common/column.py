@@ -13,8 +13,9 @@ sizes = { np.int8: SIZE_INT,
           np.object_: SIZE_OBJ, bytearray: SIZE_OBJ
     , datetime.date: SIZE_TIME, datetime.time: SIZE_TIME, 'timestamp': SIZE_TIME, np.datetime64: SIZE_TIME}
 
+
 class Column:
-    def __init__(self, name=None, dtype=None, table=None, schema=None, nullable=True, srccol=None, transform=None,
+    def __init__(self, name=None, dtype=None, table=None, schema=None, nullable=True, srccol=None, expr=None,
                  source_table=None, avg_size=-1, agg_func=None, null_frac=0, max_val=None, n_distinct=1):
         self.name = name
         self.dtype = dtype
@@ -22,7 +23,7 @@ class Column:
         self.schema = schema
         self.nullable = nullable
         self.srccol = srccol
-        self.column_expr = transform
+        self.column_expr = expr
         self.source_table = source_table
         self.agg_func = agg_func
         self.avg_size = avg_size
@@ -48,8 +49,15 @@ class Column:
               f'db_table={self.source_table}, agg={self.agg_func}, expr={self.column_expr}>'
         return str
 
+    def __eq__(self, other):
+        eq = type(self) == type(other)
+        if eq:
+            for k in self.__dict__:
+                eq = eq & (self.__dict__[k] == other.__dict__[k])
+        return eq
+
+
 def get_size(tp):
     if tp and tp in sizes:
         return sizes[tp]
     return 4
-

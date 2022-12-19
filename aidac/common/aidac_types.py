@@ -4,10 +4,15 @@ from typing import Union
 import numpy as np
 import typing
 
-ConstantTypes = Union[str, float, int, bool, np.int, np.float, datetime.date, datetime.datetime, datetime.timedelta, np.datetime64]
-ArrayLike = Union[np.ndarray, list, tuple]
 NumericTypes = Union[float, int, np.int, np.float, np.float32, np.float64, np.int32]
 FloatType = Union[float, np.float, np.float64, np.float32]
+TimeTypes = Union[datetime.time, datetime.date, datetime.datetime, np.datetime64]
+# ConstantTypes = Union[str, float, int, bool,
+#                       np.int, np.float,
+#                       datetime.date, datetime.datetime, datetime.timedelta, np.datetime64]
+ConstantTypes = Union[NumericTypes, FloatType, TimeTypes]
+ArrayLike = Union[np.ndarray, list, tuple]
+
 
 
 def in_type(value, expected: typing._GenericAlias) -> bool:

@@ -112,7 +112,7 @@ class MyTestCase(unittest.TestCase):
         sql = fillna.transform.genSQL
         self.assertEqual(sql,
                          "SELECT  coalesce( couple_id,'0')  AS couple_id, coalesce( hcardid,'0')  AS hcardid, coalesce( sid,'0')  AS sid FROM (SELECT * FROM couple) couple")
-        #
+
 
     def test_dropduplicate(self):
         dd = self.coup_.drop_duplicates()
@@ -318,6 +318,7 @@ class MyTestCase(unittest.TestCase):
 
         self.assertEqual(mw_sql4, "SELECT * FROM (SELECT email AS email FROM (SELECT * FROM midwife"
                                   ") midwife) SQLProjectionTransform8 WHERE LOWER(email) LIKE '%ewfw%'")
+
 
 
 

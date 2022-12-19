@@ -19,7 +19,7 @@ from aidac.exec.utils import *
 
 from aidac.data_source.DataSourceManager import manager, LOCAL_DS
 
-BOUND1 = 200
+BOUND1 = 1000
 
 def is_local(df1: frame.DataFrame, df2: frame.DataFrame):
     """
@@ -212,7 +212,11 @@ class Executable:
             for c in self.df.columns:
                 col = self.df.columns[c]
                 if isinstance(col.dtype, object):
-                    est_width += _random_sampling_string_len(self.df.data[c])
+                    # todo: series has shape (n, ), no column names l_extendedprice for binaryoperationTransform
+                    if isinstance(self.df.data, pd.Series):
+                        est_width += _random_sampling_string_len(self.df.data)
+                    else:
+                        est_width += _random_sampling_string_len(self.df.data[c])
                 else:
                     est_width += col.get_size()
         col_meta = self._get_col_meta(collected_cols)
@@ -265,13 +269,20 @@ class Executable:
             meta = self._my_estimation()
             self.plans = all_paths
         else:
+            # put the materialization here todo: move this or estimate on local data
+            if self.df.data_source is None and self.df.data is None:
+                data = self.perform_local_operation(self.df)
+                self.clear_lineage()
+                self.df._data_ = data
+                from aidac.data_source.DataSource import local_ds
+                self.df.set_ds(local_ds)
+
             # local data, directly compute the meta data using pandas
             if self.df.data is not None:
                 meta = self._local_card_estimate(jn_cols)
             else:
-                # as we have no prereqs, all data has to be in the same database. Thus we can directly use genSQL
-                if self.df.data_source is None:
-                    print(f'{self.df} has None datasource')
+                # as we have no prereqs, all data has to be in the same database. Thus we can directly use genSQ
+
                 est_row, est_width = \
                     self.df.data_source.get_estimation(self.df.genSQL)
                 col_meta = self._get_col_meta(jn_cols)
