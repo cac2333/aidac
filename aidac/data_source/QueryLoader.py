@@ -23,6 +23,9 @@ class QueryLoader:
         """
         return self.load_query('list_tables')
 
+    def column_stats(self, table_name, column_name):
+        return self.load_query('column_stats').format(table_name, column_name)
+
     def table_columns(self, table_name):
         """
         List table (column) metadata
@@ -30,6 +33,9 @@ class QueryLoader:
         @return:
         """
         return self.load_query('table_columns').format(table_name)
+
+    def table_column_width(self, table_name):
+        return self.load_query("table_column_width").format(table_name)
 
     def create_table(self, table_name, cols_def):
         """

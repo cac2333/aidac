@@ -9,13 +9,17 @@ list_tables:
 
 table_columns:
   postgres: |-
-    SELECT table_schema as schemaName, table_name as tableName, column_name as columnName, data_type as columnType, 
-    0 as columnSize, ordinal_position as columnPos, is_nullable as columnNullable
+    SELECT table_schema, table_name, column_name, is_nullable, data_type, numeric_precision
     FROM information_schema.columns 
     WHERE table_name = '{}' 
-    ORDER BY schemaName, tableName, columnPos;
+    ORDER BY table_schema, table_name, column_name;
   postgres2: |-
     CREATE OR REPLACE FUNCTION select_col_meta (_)
+
+table_column_width:
+  postgres: |-
+      SELECT attname, avg_width FROM pg_stats
+      WHERE tablename = '{}';
 
 sampled_column_size_func:
   postgres: |-
@@ -40,6 +44,12 @@ test:
   postgres: |-
     ||
 
+column_stats:
+  postgres: |-
+    SELECT null_frac, n_distinct, most_common_vals, most_common_freqs, histogram_bounds, avg_width FROM pg_stats
+    WHERE tablename = '{}' and attname = '{}'
+
+
 table_column_meta_func:
   postgres: |-
     CREATE OR REPLACE FUNCTION pg_temp.col_meta_of_table(text, int)
@@ -47,7 +57,9 @@ table_column_meta_func:
                    is_nullable bool, 
                    data_type text,
                   max_len numeric,
-                  avg_len numeric, null_frac numeric, n_distinct numeric)
+                  avg_len numeric, null_frac numeric, n_distinct numeric, 
+                  hist anyarray, mcv anyarray, mcf anyarray
+    )
     LANGUAGE plpgsql STABLE AS	
     $func$
     DECLARE
@@ -68,7 +80,7 @@ table_column_meta_func:
             data_type = tup.data_type;
             max_len = tup.max_len;
             -- 		avg_len = sampled_length(threshold, tb_name, cname);
-            EXECUTE 'SELECT null_frac, n_distinct, most_common_vals, avg_width FROM pg_stats 
+            EXECUTE 'SELECT null_frac, n_distinct, most_common_vals, most_common_freqs, histogram_bounds, avg_width FROM pg_stats 
             WHERE tablename = '|| quote_nullable(tb_name) || ' and attname = ' ||quote_nullable(cname) INTO STRICT hist;
             avg_len = hist.avg_width;
             null_frac = hist.null_frac;

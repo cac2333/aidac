@@ -50,15 +50,17 @@ def get_hist(df: frame.DataFrame, col: str):
         # todo: handle empty set, same as the groupby part
         n_null = df.data[col].isnull().sum()
         n_distinct = len(np.unique(df.data[col].to_numpy()))
-        hist = Histgram(df.table_name, n_null/total, n_distinct)
+        # assume uniform distribution (no histogram bound, mcv, mcf)
+        hist = Histgram(df.table_name, col, n_null/total, n_distinct)
     else:
         while df.transform is not None:
             df = df.transform.sources()
             if is_type(df, ArrayLike):
                 df = df[0]
-        table_name, null_frac, n_distinct, mcv = df.data_source.get_hist(df.table_name, col)
-        hist = Histgram(table_name, null_frac, n_distinct, mcv, col)
+        null_frac, n_distinct, mcv, mcf, hist_bounds, avg_width = df.data_source.get_hist(df.table_name, col)
+        hist = Histgram(df.table_name, col, null_frac, n_distinct, mcv, mcf, hist_bounds)
     return hist
+
 
 def _estimate_col_width(df):
     est_width = 0
@@ -66,6 +68,7 @@ def _estimate_col_width(df):
         col = df.columns[c]
         est_width += col.get_size()
     return est_width
+
 
 def _random_sampling_string_len(col: pd.Series):
     """
@@ -95,6 +98,21 @@ class Executable:
         self.planned_job = None
         self.estimated_meta = None
         self.plans = None
+
+    def _format_prereqs_str(self):
+        children = [str(c) for c in self.prereqs]
+        child_lines = [''.join(map(lambda x: '\t' + x, c.splitlines())) for c in children]
+        return child_lines
+
+    def __str__(self):
+        st = f'Base Block( \n' \
+             f'\tdataframe root: {self.df}, \n' \
+             f'\tPlanned data source: {self.planned_job}, \n' \
+             f'\tEstimated size: ({self.estimated_meta.nrows}, {self.estimated_meta.cwitdh}) \n' \
+             f'\tChildren: (\n' \
+             f'\t{self._format_prereqs_str()} ' \
+             f')'
+        return st
 
     def to_be_executed_locally(self, df):
         """
@@ -199,6 +217,12 @@ class Executable:
         return data
 
     def _get_col_meta(self, collected_cols):
+        """
+        using get_hist function to get the histogram and mcv .etc for each column
+        put in a dictionary with the column name as key and histogram object as the value
+        @param collected_cols:
+        @return:
+        """
         col_meta = {}
         for c in self.df.columns:
             if c in collected_cols:
@@ -206,6 +230,7 @@ class Executable:
         return col_meta
 
     def _local_card_estimate(self, collected_cols):
+        """estimate row and column width if the table is materialized"""
         est_row = len(self.df.data)
         est_width = 0
         if est_row > 0:
@@ -308,6 +333,15 @@ class TransferExecutable(Executable):
         self.prereqs = prereqs
         self.dest = dest
 
+    def __str__(self):
+        st = f'Transfer Block( \n' \
+             f'\tDataframe root ds: {self.df.data_source.job_name}, \n' \
+             f'\tDestination: {self.dest}, \n' \
+             f'\tChildren: (\n' \
+             f'\t{self._format_prereqs_str()} ' \
+             f')'
+        return st
+
     def transfer(self, src: frame.DataFrame, dest: str):
         """
         Transfer data from one datasource to another
@@ -362,6 +396,7 @@ class RootExecutable(Executable):
     def __init__(self):
         self.prereqs = []
         self.plans = None
+        self.opt_plan = None
 
     def _get_lowest_cost_path(self, paths):
         lowest, opt_path = paths[0]
@@ -424,6 +459,7 @@ class RootExecutable(Executable):
             path, lowest = self._get_lowest_cost_path(all_path)
             self._insert_transfer_block(self, path)
             self.pre_process()
+            self.opt_plan = path
         print(f'estimated cost: {lowest}')
         return path
 
@@ -452,6 +488,14 @@ class ScheduleExecutable(Executable):
         self.prev_ex = prev_ex
         self.prereqs = []
         self.plans = None
+
+    def __str__(self):
+        st = f'Schedule Block( \n' \
+             f'\tDataframe root: {self.prev}, \n' \
+             f'\tChildren: (\n' \
+             f'\t{self._format_prereqs_str()} ' \
+             f')'
+        return st
 
     def plan(self, jn_cols=[]):
         if not self.plans:
@@ -549,18 +593,16 @@ class ScheduleExecutable(Executable):
         # choose the column with the largest distinct value to work with
         distinct1, distinct2 = 0, 0
 
-        # distinct can be negative ratio or positive number:
-        # todo: move to data source?
-        def convert_distinct(dn, rn):
-            return -dn * rn if dn < 0 else dn
+        # # distinct can be negative ratio or positive number:
+        # # todo: move to data source?
+        # def convert_distinct(dn, rn):
+        #     return -dn * rn if dn < 0 else dn
 
         for jc1, jc2 in trans.join_cols:
             # mismatch distinct values do not matter for now as we only use the biggest value
             if jc1 in meta1.cmetas and jc2 in meta2.cmetas:
-                d1 = meta1.cmetas[jc1].n_distinct
-                distinct1 = convert_distinct(d1, meta1.nrows)
-                d2 = meta2.cmetas[jc2].n_distinct
-                distinct2 = convert_distinct(d2, meta2.nrows)
+                distinct1 = meta1.cmetas[jc1].n_distinct
+                distinct2 = meta2.cmetas[jc2].n_distinct
 
         if distinct1 == 0:
             distinct1 = meta1.nrows

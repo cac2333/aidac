@@ -244,10 +244,7 @@ class DataFrame:
                     # materialize column info
                     self._columns_ = self.transform.columns
                 else:
-                    cols = self.data_source.table_columns(self.source_table)
-                    self._columns_ = collections.OrderedDict()
-                    for col in cols:
-                        self._columns_[col.name] = col
+                    self._columns_ = self.data_source.table_columns(self.source_table)
         return self._columns_
 
     @property
@@ -473,42 +470,42 @@ class DataFrame:
         if is_type(other, ConstantTypes) or is_type(other, DataFrame):
             trans = SQLFilterTransform(self, "eq", other)
             return DataFrame(ds=self.data_source, transform=trans)
-        raise ValueError("object comparison is not supported by remotetables")
+        raise ValueError("object comparison (==) is not supported by remotetables")
 
     @local_frame_wrapper
     def __ge__(self, other):
         if is_type(other, ConstantTypes) or is_type(other, DataFrame):
             trans = SQLFilterTransform(self, "ge", other)
             return DataFrame(ds=self.data_source, transform=trans)
-        raise ValueError("object comparison is not supported by remotetables")
+        raise ValueError("object comparison (>=) is not supported by remotetables")
 
     @local_frame_wrapper
     def __gt__(self, other) :
         if is_type(other, ConstantTypes) or is_type(other, DataFrame):
             trans = SQLFilterTransform(self, "gt", other)
             return DataFrame(ds=self.data_source, transform=trans)
-        raise ValueError("object comparison is not supported by remotetables")
+        raise ValueError("object comparison (>) is not supported by remotetables")
 
     @local_frame_wrapper
     def __ne__(self, other):
         if is_type(other, ConstantTypes) or is_type(other, DataFrame):
             trans = SQLFilterTransform(self, "ne", other)
             return DataFrame(ds=self.data_source, transform=trans)
-        raise ValueError("object comparison is not supported by remotetables")
+        raise ValueError("object comparison (!=) is not supported by remotetables")
 
     @local_frame_wrapper
     def __lt__(self, other) :
         if is_type(other, ConstantTypes) or is_type(other, DataFrame):
             trans = SQLFilterTransform(self, "lt", other)
             return DataFrame(ds=self.data_source, transform=trans)
-        raise ValueError("object comparison is not supported by remotetables")
+        raise ValueError("object comparison (<) is not supported by remotetables")
 
     @local_frame_wrapper
     def __le__(self, other):
         if is_type(other, ConstantTypes) :
             trans = SQLFilterTransform(self, "le", other)
             return DataFrame(ds=self.data_source, transform=trans)
-        raise ValueError("object comparison is not supported by remotetables")
+        raise ValueError("object comparison (<=) is not supported by remotetables")
 
     @binary_op_local_frame_wrapper
     def __and__(self, other):
@@ -573,21 +570,31 @@ class DataFrame:
                 raise ValueError('Assigned Dataframe has different column length')
 
     def _is_direct_ancestor_of(self, other: DataFrame):
+        """
+        Return true if self is a direct ancestor of other
+        @param other:
+        @return:
+        """
         # check if the two from the same tree branch without filter, aggregation, or groupby in between
+        # join and project might have 2 sources
         start = other
         while start.transform is not None:
             if is_type(start.transform, NON_PASS_TRANSFORM):
                 break
-            if start != self:
-                start = start.transform.sources()
+            if start is self:
+                # this scenario has to be filtered projection, we use the first item (the base table)
+                if is_type(start.transform.sources(), ArrayLike):
+                    start = start.transform.sources()[0]
+                else:
+                    start = start.transform.sources()
             else:
                 return True
         return False
 
-    def _handle_df_cols(self, key, val_col:Column, val: DataFrame):
+    def _handle_df_cols(self, key, val_col: Column, val: DataFrame):
         force_local = False
         if self._is_direct_ancestor_of(val) or val._is_direct_ancestor_of(self):
-            new_col = Column(name=key, dtype=val_col.dtype, source_table=val_col.source_table)
+            new_col = Column(name=key, dtype=val_col.dtype, source_table=val_col.source_table, expr=val_col.column_expr)
         else:
             warnings.warn('assigned column from a different table', ForceLocalExecutionWarning)
             force_local = True
@@ -613,7 +620,7 @@ class DataFrame:
             warnings.warn(ForceLocalExecutionWarning)
             new_col_type = val.dtype if hasattr(val, 'dtype') else object
             new_col = Column(key, new_col_type)
-            force_local = False
+            force_local = True
         else:
             raise ValueError('Unsupported value type')
         return new_col, force_local
@@ -679,10 +686,8 @@ class DataFrame:
             # check the key and the df have the same column length
             if len(key) != len(val.columns):
                 raise ValueError('The data to be assigned must have the same dimension as the keys')
-            elif len(val.columns) != 1:
-                raise ValueError('Can only assign dim-1 vector to a column')
             else:
-                for k, v in zip(key, val.columns):
+                for k, (vk, v) in zip(key, val.columns.items()):
                     new_col, fl = self._handle_df_cols(k, v, val)
                     all_cols[k] = new_col
                     force_local = fl | force_local

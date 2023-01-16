@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections
 import datetime
 import time
 from collections import OrderedDict
@@ -21,14 +22,14 @@ from aidac.data_source.ResultSet import ResultSet
 DS = 'postgres'
 ql = QueryLoader(DS)
 
-
-typeConverter = { np.int8: 'TINYINT', np.int16: 'SMALLINT', np.int32: 'INT', np.int64: 'NUMERIC', float: 'FLOAT'
+typeConverter = {np.int8: 'TINYINT', np.int16: 'SMALLINT', np.int32: 'INT', np.int64: 'NUMERIC', float: 'FLOAT'
     , np.float32: 'FLOAT', np.float64: 'FLOAT', np.object: 'VARCHAR(300)', np.object_: 'VARCHAR(300)', bytearray: 'BLOB'
     , datetime.date: 'DATE', datetime.time: 'TIME', 'timestamp': 'TIMESTAMP', np.datetime64: 'TIMESTAMP'}
 
 typeConverter_rev = {'integer': np.int32, 'character varying': np.object, 'double precision': np.float64,
                      'numeric': np.float, 'character': np.object,
-                     'boolean': bool, 'date': 'date', 'timestamp without time zone': 'timestamp', "datetime": datetime.date
+                     'boolean': bool, 'date': 'date', 'timestamp without time zone': 'timestamp',
+                     "datetime": datetime.date
                      }
 
 constant_converter = {'YES': True, 'NO': False}
@@ -57,8 +58,9 @@ class PostgreDataSource(DataSource):
     def _bootstrap(self):
         # preload all the session temporary functions
         # qry = ql.create_sampled_column_size()
-        qry = ql.create_table_column_meta()
-        self._execute(qry)
+        # qry = ql.create_table_column_meta()
+        # self._execute(qry)
+        pass
 
     def ls_tables(self):
         qry = ql.list_tables()
@@ -77,26 +79,49 @@ class PostgreDataSource(DataSource):
                 width = len(row)
                 data_len += 1
                 copy.write_row(row)
-        print('loading data time: '+str(start-time.time()))
-        print(f'imported data size {data_len*width}')
+        print('loading data time: ' + str(start - time.time()))
+        print(f'imported data size {data_len * width}')
+
+    # def table_columns(self, table: str):
+    #     qry = ql.table_column_meta(table, 200)
+    #     print(qry)
+    #     rs = self._execute(qry).data
+    #     # expected return value from pg:
+    #     # returned value: cname text,
+    #     #                  is_nullable bool,
+    #     #                  data_type text,
+    #     #                 max_val numeric,
+    #     #                 avg_len numeric, null_frac numeric, n_distinct numeric
+    #     cols = []
+    #     for x in rs:
+    #         col = Column(name=x[0], table=table,
+    #                    dtype=typeConverter_rev[x[2]], nullable=convert_const(x[1]),
+    #                    source_table=table, avg_size=float(x[4]), max_val=x[3],
+    #                      null_frac=float(x[5]), n_distinct=float(x[6]))
+    #         cols.append(col)
+    #     return cols
 
     def table_columns(self, table: str):
-        qry = ql.table_column_meta(table, 200)
-        print(qry)
+        qry = ql.table_columns(table)
         rs = self._execute(qry).data
         # expected return value from pg:
-        # returned value: cname text,
+        # returned value: schema, table, col_name,
         #                  is_nullable bool,
         #                  data_type text,
-        #                 max_val numeric,
-        #                 avg_len numeric, null_frac numeric, n_distinct numeric
-        cols = []
+        #                 precision int,
+        cols = collections.OrderedDict()
         for x in rs:
-            col = Column(name=x[0], table=table,
-                       dtype=typeConverter_rev[x[2]], nullable=convert_const(x[1]),
-                       source_table=table, avg_size=float(x[4]), max_val=x[3],
-                         null_frac=float(x[5]), n_distinct=float(x[6]))
-            cols.append(col)
+            schema, tb_name, col_name, nullable, db_type, precision = x
+            col = Column(name=col_name, schema=schema, table=table,
+                         dtype=typeConverter_rev[db_type], nullable=convert_const(nullable),
+                         source_table=table)
+            cols[col_name] = col
+
+        # get the average width for each column
+        qry = ql.table_column_width(table)
+        rs = self._execute(qry).data
+        for name, width in rs:
+            cols[name].avg_size = width
         return cols
 
     def row_count(self, table: str):
@@ -120,7 +145,7 @@ class PostgreDataSource(DataSource):
         for cname, col in cols.items():
             db_type = typeConverter[col.dtype]
             # print(f'converting: {col.dtype} -> {db_type}')
-            col_def.append(str(cname)+' '+db_type)
+            col_def.append(str(cname) + ' ' + db_type)
         col_def = ', '.join(col_def)
 
         qry = ql.create_table(table_name, col_def)
@@ -133,17 +158,19 @@ class PostgreDataSource(DataSource):
         rs = self._execute(qry)
         return rs.get_result_table()
 
-    def get_hist(self, table_name:str, column_name:str):
-        qry = ql.get_hist(table_name, column_name)
+    def get_hist(self, table_name: str, column_name: str):
+        qry = ql.column_stats(table_name, column_name)
         rs = self._execute(qry)
         # n_distinct = -1 if all values are distinct, otherwise a negative fraction is used
         # todo: maybe we can optimise this later
         val = rs.get_value()
-        table_name, null_frac, n_distinct, mcv = val if val else (table_name, 0, 1, [])
-        # need to calculate the actual distinct values
-        # todo: double check the format of n_distinct
-        # n_distinct = self.row_count(table_name) * (-n_distinct)
-        return table_name, null_frac, n_distinct, mcv
+        print(val)
+        null_frac, n_distinct, mcv, mcf, hist_bounds, avg_width = val if val else (0, 1, None, None, None, 4)
+        # If greater than zero, the estimated number of distinct values in the column.
+        # If less than zero, the negative of the number of distinct values divided by the number of rows.
+        # todo: maby should store the table meta info within ds
+        n_distinct = self.row_count(table_name) * (-n_distinct) if n_distinct < 0 else n_distinct
+        return null_frac, n_distinct, mcv, mcf, hist_bounds, avg_width
 
     def get_estimation(self, qry):
         self._execute(ql.drop_estimation_func())

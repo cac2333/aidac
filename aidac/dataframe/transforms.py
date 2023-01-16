@@ -131,7 +131,7 @@ class SQLTransform(Transform):
         sdbtables = []
         srccols = []
         scol = src_cols.get(srccol)
-        if not scol:
+        if not scol and not coltransform:
             raise AttributeError("Cannot locate column {} from {}".format(srccol, table_name))
         else:
             srccols += (scol.name if (isinstance(scol.name, list)) else [scol.name])

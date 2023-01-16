@@ -46,9 +46,9 @@ class DataSource:
 
     def table_columns(self, table: str):
         """
-        Retrieve the column metadata of a table
+        Retrieve the column name, dtype...
         @param table:
-        @return:
+        @return: a dict of columns
         """
         pass
 

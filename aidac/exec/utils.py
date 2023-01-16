@@ -1,5 +1,64 @@
 from __future__ import annotations
 
+"""
+Most of the algorithms follow 
+https://www.postgresql.org/docs/current/row-estimation-examples.html
+"""
+
+
+def estimate_filter_card_p_uni(card, dist):
+    return card * (1/dist)
+
+
+def estimate_filter_card_c_uni(card, val, min, max):
+    return card * (val-min) / (max-min)
+
+
+def estimate_filter_card_c_hist(card, val, hist):
+    """
+    estimate filter output size for a single value selection
+    @param val: selection criteria
+    @param card: row number
+    @param hist: iterable histogram
+    @return: estimated number of rows
+    """
+
+    # find the bucket of the histogram the value falls into
+    # assume no value is smaller than the lowest bound or greater than the upper bound
+    upper = next(hist)
+    lower = None
+    bucket = 0
+    nbucket = len(hist) - 1
+    while val > upper and bucket <= nbucket:
+        lower = upper
+        upper = next(val)
+        bucket += 1
+
+    rho = (bucket + (val-lower)/(upper-lower))/nbucket
+    return card * rho
+
+
+def estimate_filter_card_p_mcv(card, val, mcv, mcf, dist):
+    """
+    estimate filter output size for a contiguous range selection
+    @param card: row numbers
+    @param val: selection criteria
+    @param mcv: iterable most common values
+    @param mcf: iterable corresponding most common frequencies
+    @param dist: number of distinct values
+    @return:
+    """
+    pos = -1
+    for idx, v in enumerate(mcv):
+        if v == val:
+            pos = idx
+            break
+    if pos != -1:
+        return card * mcf[pos]
+    else:
+        return card * (1 - sum(mcf)) / (dist - len(mcv))
+
+
 
 def estimate_join_card(card1, card2, null1, null2, distinct1, distinct2):
     """

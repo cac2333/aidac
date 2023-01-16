@@ -10,7 +10,7 @@ TimeTypes = Union[datetime.time, datetime.date, datetime.datetime, np.datetime64
 # ConstantTypes = Union[str, float, int, bool,
 #                       np.int, np.float,
 #                       datetime.date, datetime.datetime, datetime.timedelta, np.datetime64]
-ConstantTypes = Union[NumericTypes, FloatType, TimeTypes]
+ConstantTypes = Union[NumericTypes, FloatType, TimeTypes, str]
 ArrayLike = Union[np.ndarray, list, tuple]
 
 
