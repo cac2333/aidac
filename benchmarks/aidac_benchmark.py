@@ -301,12 +301,12 @@ def q_15_v1(locs, remotes):
     # todo: having t=ti here cause datasource to be none
     t = ti
     ti = ti[['p_partkey', 'l_quantity']].head(200)
+    ti = ti.groupby('p_partkey').mean()
+    ti.reset_index(inplace=True)
+    ti['avg_qty'] = ti['l_quantity'] * 0.2
+    ti = ti[['p_partkey', 'avg_qty']]
     ti.materialize()
     print(ti.data)
-    ti = ti.groupby('p_partkey').mean()
-    ti['avg_qty'] = ti['l_quantity'] * 0.2
-    ti.reset_index(inplace=True)
-    ti = ti[['p_partkey', 'avg_qty']]
 
     t = t[(t['p_brand'] == 'Brand#23') & (t['p_container'] == 'MED BOX')]
     t = t.merge(ti, left_on='p_partkey', right_on='p_partkey')
@@ -354,7 +354,7 @@ if __name__ == '__main__':
     connect(db_config['host'], db_config['schema'], db_config['db'], db_config['port'], db_config['user'],
                  db_config['passwd'])
     full_qry = ['mini_03', 'mini_05', 'mini_06', 'q_03_v1', 'q_10_v1', 'q_13_v1', 'q_14_v1']
-    qrys = ['mini_06']
+    qrys = ['q_15_v1']
     for q in full_qry:
         for ls, rs in table_dist[q]:
             try:

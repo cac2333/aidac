@@ -380,7 +380,7 @@ class SQLPlaceHolder(SQLTransform):
     @property
     def columns(self):
         if self._columns_ is None:
-            self._columns_ = super.columns
+            self._columns_ = super().columns
         return self._columns_
 
     @property

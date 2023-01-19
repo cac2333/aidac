@@ -162,11 +162,13 @@ class Executable:
             # if isinstance(df.transform, SQLProjectionTransform):
             #     data = func(df._saved_args_, **df._saved_kwargs_)
             # else:
+            updated_args = list(df._saved_args_)
             for idx, arg in enumerate(df._saved_args_):
                 from aidac.dataframe.frame import DataFrame
                 if isinstance(arg, DataFrame):
                     # todo: happens only at project. Based on current impl, this has to be local
-                    df._saved_args_[idx] = self.perform_local_operation(arg)
+                    updated_args[idx] = self.perform_local_operation(arg)
+            df._saved_args_ = updated_args if updated_args else df._saved_args_
 
             # in case the function does not return a new dataframe (imply it change the old df in place), we return the old data
             new_data = func(*df._saved_args_, **df._saved_kwargs_)

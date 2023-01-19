@@ -382,7 +382,7 @@ class DataFrame:
     @local_frame_wrapper
     def mean(self):
         trans = SQLAGG_Transform(self, func='avg', collist=self.columns.keys())
-        return DataFrame(df=self.data_source, transform=trans)
+        return DataFrame(ds=self.data_source, transform=trans)
 
     @local_frame_wrapper
     def min(self):

@@ -142,7 +142,11 @@ class WFrame:
         return WFrame(self._tail_frame.sort_values(orderlist, ascending=ascending))
 
     def reset_index(self, inplace=True):
-        return WFrame(self._tail_frame.reset_index(inplace=inplace))
+        new_df = self._tail_frame.reset_index(inplace=inplace)
+        if inplace:
+            self._frame_stubs.append(new_df)
+            self._tail_frame = new_df
+        return WFrame(new_df)
 
     def count(self):
         return WFrame(self._tail_frame.count())
