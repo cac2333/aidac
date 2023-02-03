@@ -77,7 +77,7 @@ class ResultSet:
 
         row_max = len(self.data)
         col_max = len(self.columns)
-        print(f'returned table size: {row_max*col_max}')
+        # print(f'returned table size: {row_max*col_max}')
         return od
 
     def to_tb(self, tracked_cols):
@@ -102,7 +102,7 @@ class ResultSet:
 
         row_max = len(self.data)
         col_max = len(self.columns)
-        print(f'returned table size: {row_max}*{col_max}')
+        # print(f'returned table size: {row_max}*{col_max}')
         return od
 
     def to_pd(self):

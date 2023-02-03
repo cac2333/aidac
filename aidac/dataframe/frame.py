@@ -327,12 +327,13 @@ class DataFrame:
         return DataFrame(ds=self.data_source, transform=transform)
 
     @local_frame_wrapper
-    def agg(self, collist: Union[None, List[str], Dict, str] = None):
+    def agg(self, collist: Union[None, List[str], Dict, str] = None, numeric_only=False):
         if isinstance(collist, str):
             func = collist
+            collist = []
         else:
             func = None
-        trans = SQLAGG_Transform(self, func=func, collist=collist)
+        trans = SQLAGG_Transform(self, func=func, collist=collist, numeric_only=numeric_only)
         return DataFrame(ds=self.data_source, transform=trans)
 
     # def isin(self, values: list):

@@ -79,8 +79,8 @@ class PostgreDataSource(DataSource):
                 width = len(row)
                 data_len += 1
                 copy.write_row(row)
-        print('loading data time: ' + str(start - time.time()))
-        print(f'imported data size {data_len * width}')
+        # print('loading data time: ' + str(start - time.time()))
+        # print(f'imported data size {data_len * width}')
 
     # def table_columns(self, table: str):
     #     qry = ql.table_column_meta(table, 200)
@@ -149,7 +149,7 @@ class PostgreDataSource(DataSource):
         col_def = ', '.join(col_def)
 
         qry = ql.create_table(table_name, col_def)
-        print('------------create tb-----------\n{}'.format(qry))
+        #_print('------------create tb-----------\n{}'.format(qry))
         self._execute(qry)
         return col_def
 
@@ -164,7 +164,7 @@ class PostgreDataSource(DataSource):
         # n_distinct = -1 if all values are distinct, otherwise a negative fraction is used
         # todo: maybe we can optimise this later
         val = rs.get_value()
-        print(val)
+        # print(val)
         null_frac, n_distinct, mcv, mcf, hist_bounds, avg_width = val if val else (0, 1, None, None, None, 4)
         # If greater than zero, the estimated number of distinct values in the column.
         # If less than zero, the negative of the number of distinct values divided by the number of rows.
@@ -182,7 +182,7 @@ class PostgreDataSource(DataSource):
     def table_exists(self, table: str):
         qry = ql.table_exists(table)
         r = self._execute(qry).get_value()
-        print(f'table exist = {r}')
+        # print(f'table exist = {r}')
         return r
 
     def _execute(self, qry, *args) -> ResultSet | None:

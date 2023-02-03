@@ -119,7 +119,9 @@ class WFrame:
     def aggregate(self, projcols, groupcols=None):
         return WFrame(self._tail_frame.aggregate(projcols, groupcols=groupcols))
 
-    def agg(self, collist=None):
+    def agg(self, collist=None, numeric_only=None):
+        if numeric_only:
+            return WFrame(self._tail_frame.agg(collist, numeric_only=numeric_only))
         return WFrame(self._tail_frame.agg(collist))
 
     def contains(self, pat: str, case=True, regex=True):

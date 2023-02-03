@@ -199,7 +199,7 @@ class Executable:
             sql = self.df.genSQL
             # print('sql generated: \n{}'.format(sql))
             ds = manager.get_data_source(self.planned_job)
-            print('***************\n'+sql+'\n++**********')
+            #_print('***************\n'+sql+'\n++**********')
             expl = 'explain analyze ('+sql+')'
             # rs = ds._execute(expl)
 
@@ -208,7 +208,7 @@ class Executable:
             returned = time.time()
             data = rs.to_tb(self.df.columns)
             # get result table and convert to dataframe
-            print('sql time = {}, conversion time = {}, total={}'.format(returned-start, time.time()-returned, time.time()-start))
+            #_print('sql time = {}, conversion time = {}, total={}'.format(returned-start, time.time()-returned, time.time()-start))
             #todo: q10_v1 local: orders
             # SystemError: <built-in function ensure_datetime64ns> returned a result with an error set
             data = pd.DataFrame(data, columns=self.df.columns.keys())
@@ -462,7 +462,7 @@ class RootExecutable(Executable):
             self._insert_transfer_block(self, path)
             self.pre_process()
             self.opt_plan = path
-        print(f'estimated cost: {lowest}')
+        #_print(f'estimated cost: {lowest}')
         return path
 
     def process(self):
