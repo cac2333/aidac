@@ -1,0 +1,5 @@
+[Dist (p1)]
+local tables: ['nation', 'orders', 'lineitem', 'part', 'partsupp', 'region']
+remote tables: ['customer', 'supplier']
+Start index = 0, end index = 3000, step = 10
+total count = 300, error_count = 32

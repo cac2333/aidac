@@ -1,0 +1,2847 @@
+reading nation
+reading orders
+reading part
+reading partsupp
+reading region
+**#**
+selected plan: 
+p1(480.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [0]  = 0.4291565418243408
+**#**
+selected plan: 
+_local_ds(11147):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [1]  = 0.08299875259399414
+**#**
+selected plan: 
+_local_ds(11147):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [2]  = 0.3390476703643799
+**#**
+selected plan: 
+_local_ds(11147):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [3]  = 0.538877010345459
+**#**
+selected plan: 
+_local_ds(11147):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [4]  = 0.07249212265014648
+**#**
+selected plan: 
+_local_ds(11147):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [5]  = 0.06331229209899902
+**#**
+selected plan: 
+_local_ds(11147):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [6]  = 0.10573601722717285
+**#**
+selected plan: 
+_local_ds(11147):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [7]  = 0.11196541786193848
+**#**
+selected plan: 
+_local_ds(11147):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [8]  = 0.13300085067749023
+**#**
+selected plan: 
+_local_ds(11147):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [9]  = 0.06600189208984375
+**#**
+selected plan: 
+p1(192.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [10]  = 0.0729985237121582
+**#**
+selected plan: 
+_local_ds(11147):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [11]  = 0.06207108497619629
+**#**
+selected plan: 
+_local_ds(11147):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [12]  = 0.05992889404296875
+**#**
+selected plan: 
+_local_ds(11147):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [13]  = 0.9800031185150146
+**#**
+selected plan: 
+_local_ds(11147):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [14]  = 0.061029911041259766
+**#**
+selected plan: 
+p1(576.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [15]  = 0.5830032825469971
+**#**
+selected plan: 
+p1(2658.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [16]  = 0.06696367263793945
+**#**
+selected plan: 
+_local_ds(24):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [17]  = 0.03502821922302246
+**#**
+selected plan: 
+_local_ds(24):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [18]  = 0.49627065658569336
+**#**
+selected plan: 
+_local_ds(24):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [19]  = 0.01700305938720703
+**#**
+selected plan: 
+_local_ds(24):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [20]  = 0.19599699974060059
+**#**
+selected plan: 
+_local_ds(24):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [21]  = 3.8160042762756348
+**#**
+selected plan: 
+_local_ds(24):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [22]  = 0.20671820640563965
+**#**
+selected plan: 
+_local_ds(24):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [23]  = 0.019968271255493164
+**#**
+selected plan: 
+_local_ds(24):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+perform locally on empty dataset: SQLProjectionTransform9522
+time for [24]  = 0.037990570068359375
+**#**
+selected plan: 
+_local_ds(24):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [25]  = 0.018343210220336914
+**#**
+selected plan: 
+_local_ds(24):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [26]  = 0.11304187774658203
+**#**
+selected plan: 
+_local_ds(24):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [27]  = 0.019961118698120117
+**#**
+selected plan: 
+_local_ds(24):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [28]  = 1.2840383052825928
+**#**
+selected plan: 
+_local_ds(24):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [29]  = 0.02199697494506836
+time for [30]  = 0.13599491119384766
+time for [31]  = 0.13996195793151855
+time for [32]  = 0.19800591468811035
+**#**
+selected plan: 
+_local_ds(415805):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [33]  = 0.35799574851989746
+time for [34]  = 0.13400793075561523
+time for [35]  = 0.2079939842224121
+**#**
+selected plan: 
+_local_ds(609376):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [36]  = 0.4320030212402344
+**#**
+selected plan: 
+_local_ds(600):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [37]  = 0.19229817390441895
+time for [38]  = 0.27770090103149414
+time for [39]  = 0.4730041027069092
+time for [40]  = 0.7110307216644287
+**#**
+selected plan: 
+_local_ds(1318351):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [41]  = 0.6369979381561279
+**#**
+selected plan: 
+_local_ds(700618):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [42]  = 0.35300445556640625
+**#**
+selected plan: 
+_local_ds(1342189):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [43]  = 0.44699597358703613
+time for [44]  = 0.8620212078094482
+time for [45]  = 0.19998455047607422
+time for [46]  = 0.008994340896606445
+time for [47]  = 0.011966228485107422
+time for [48]  = 0.010999441146850586
+time for [49]  = 0.00800013542175293
+time for [50]  = 0.008998632431030273
+time for [51]  = 0.008998870849609375
+time for [52]  = 0.006999492645263672
+time for [53]  = 0.00800013542175293
+**#**
+selected plan: 
+_local_ds(11147):
+	_local_ds(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [54]  = 0.0790402889251709
+**#**
+selected plan: 
+_local_ds(11147):
+	_local_ds(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [55]  = 0.06699514389038086
+**#**
+selected plan: 
+_local_ds(11147):
+	_local_ds(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [56]  = 0.06798791885375977
+**#**
+selected plan: 
+p1(1728.0):
+	_local_ds(0):
+		None
+		None
+	p1(1600.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [57]  = 0.07697439193725586
+**#**
+selected plan: 
+_local_ds(11147):
+	_local_ds(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [58]  = 0.06704092025756836
+**#**
+selected plan: 
+_local_ds(11147):
+	_local_ds(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [59]  = 0.06399798393249512
+**#**
+selected plan: 
+_local_ds(5326.0):
+	_local_ds(0):
+		None
+		None
+	p1(640.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [60]  = 0.07099533081054688
+**#**
+selected plan: 
+_local_ds(214890):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [61]  = 0.06700301170349121
+**#**
+selected plan: 
+p1(896.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [62]  = 0.05800032615661621
+**#**
+selected plan: 
+p1(192.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [63]  = 0.046004533767700195
+**#**
+selected plan: 
+_local_ds(214890):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [64]  = 0.03999781608581543
+**#**
+selected plan: 
+_local_ds(214890):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [65]  = 0.03895854949951172
+**#**
+selected plan: 
+_local_ds(214890):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [66]  = 0.03903937339782715
+**#**
+selected plan: 
+_local_ds(226037):
+	p1(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [67]  = 0.10401105880737305
+**#**
+selected plan: 
+_local_ds(226037):
+	p1(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [68]  = 0.09728455543518066
+**#**
+selected plan: 
+_local_ds(226037):
+	p1(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [69]  = 0.09970307350158691
+**#**
+selected plan: 
+_local_ds(223944.2):
+	p1(0):
+		None
+		None
+	p1(1088.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [70]  = 0.1099996566772461
+**#**
+selected plan: 
+_local_ds(226037):
+	p1(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [71]  = 0.10200881958007812
+**#**
+selected plan: 
+_local_ds(226037):
+	p1(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [72]  = 0.10599827766418457
+**#**
+selected plan: 
+_local_ds(214890):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [73]  = 0.04395484924316406
+**#**
+selected plan: 
+_local_ds(214890):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [74]  = 0.04500389099121094
+**#**
+selected plan: 
+_local_ds(214890):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [75]  = 0.04519081115722656
+**#**
+selected plan: 
+_local_ds(214890):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [76]  = 0.03984546661376953
+**#**
+selected plan: 
+_local_ds(214890):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [77]  = 0.04300379753112793
+**#**
+selected plan: 
+_local_ds(220565.6):
+	p1(0):
+		None
+		None
+	p1(1728.0):
+		_local_ds(0):
+			None
+			None
+		p1(1600.0):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [78]  = 0.12000250816345215
+**#**
+selected plan: 
+_local_ds(221076.8):
+	p1(0):
+		None
+		None
+	p1(1728.0):
+		_local_ds(0):
+			None
+			None
+		p1(1600.0):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [79]  = 0.14099979400634766
+**#**
+selected plan: 
+_local_ds(221076.8):
+	p1(0):
+		None
+		None
+	p1(1728.0):
+		_local_ds(0):
+			None
+			None
+		p1(1600.0):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [80]  = 0.12299942970275879
+**#**
+selected plan: 
+_local_ds(225792.36):
+	p1(0):
+		None
+		None
+	_local_ds(10902.36):
+		_local_ds(0):
+			None
+			None
+		p1(2016.0):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [81]  = 0.46296191215515137
+**#**
+selected plan: 
+_local_ds(219222.62):
+	p1(0):
+		None
+		None
+	p1(2116.0):
+		_local_ds(0):
+			None
+			None
+		p1(1988.0):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [82]  = 0.14102697372436523
+time for [83]  = 0.019965410232543945
+**#**
+selected plan: 
+p1(34454.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [84]  = 0.04003739356994629
+**#**
+selected plan: 
+_local_ds(700):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+perform locally on empty dataset: SQLProjectionTransform10917
+time for [85]  = 0.02899956703186035
+time for [86]  = 0.06299924850463867
+**#**
+selected plan: 
+_local_ds(1700):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [87]  = 0.02811145782470703
+time for [88]  = 0.06485724449157715
+time for [89]  = 0.07403278350830078
+time for [90]  = 0.014999151229858398
+**#**
+selected plan: 
+_local_ds(600):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [91]  = 0.023995637893676758
+**#**
+selected plan: 
+_local_ds(1096):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [92]  = 0.025020360946655273
+**#**
+selected plan: 
+_local_ds(900):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [93]  = 0.027985811233520508
+time for [94]  = 0.061010122299194336
+**#**
+selected plan: 
+_local_ds(1000):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [95]  = 0.02799701690673828
+time for [96]  = 0.06499600410461426
+**#**
+selected plan: 
+p1(62530.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [97]  = 0.054003238677978516
+time for [98]  = 0.06099367141723633
+**#**
+selected plan: 
+p1(62530.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [99]  = 0.07600617408752441
+**#**
+selected plan: 
+p1(62530.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [100]  = 0.03899884223937988
+**#**
+selected plan: 
+p1(480.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [101]  = 0.04694199562072754
+**#**
+selected plan: 
+p1(480.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [102]  = 0.03799915313720703
+**#**
+selected plan: 
+p1(480.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [103]  = 0.02400040626525879
+**#**
+selected plan: 
+p1(480.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [104]  = 0.042999267578125
+**#**
+selected plan: 
+p1(63010.0):
+	_local_ds(0):
+		None
+		None
+	p1(62530.0):
+		_local_ds(0):
+			None
+			None
+		p1(0):
+			None
+			None
+**#**
+time for [105]  = 0.11800193786621094
+**#**
+selected plan: 
+p1(63010.0):
+	_local_ds(0):
+		None
+		None
+	p1(62530.0):
+		_local_ds(0):
+			None
+			None
+		p1(0):
+			None
+			None
+**#**
+time for [106]  = 0.06091642379760742
+**#**
+selected plan: 
+p1(63010.0):
+	_local_ds(0):
+		None
+		None
+	p1(62530.0):
+		_local_ds(0):
+			None
+			None
+		p1(0):
+			None
+			None
+**#**
+time for [107]  = 0.11096429824829102
+time for [108]  = 0.014998435974121094
+time for [109]  = 0.008000850677490234
+**#**
+selected plan: 
+p1(1359.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [110]  = 0.06703901290893555
+**#**
+selected plan: 
+_local_ds(72720):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [111]  = 0.03527188301086426
+**#**
+selected plan: 
+p1(1871.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [112]  = 0.06934452056884766
+time for [113]  = 0.007042646408081055
+**#**
+selected plan: 
+_local_ds(224):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [114]  = 0.013991355895996094
+time for [115]  = 0.0060040950775146484
+time for [116]  = 0.009000062942504883
+**#**
+selected plan: 
+p1(1871.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [117]  = 0.030000686645507812
+time for [118]  = 0.006999492645263672
+**#**
+selected plan: 
+p1(1871.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [119]  = 0.02796006202697754
+**#**
+selected plan: 
+_local_ds(24):
+	_local_ds(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+perform locally on empty dataset: SQLJoinTransform11685
+perform locally on empty dataset: SQLProjectionTransform11686
+time for [120]  = 0.03704214096069336
+**#**
+selected plan: 
+_local_ds(24):
+	_local_ds(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [121]  = 0.17896008491516113
+**#**
+selected plan: 
+_local_ds(24):
+	_local_ds(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [122]  = 0.20599722862243652
+**#**
+selected plan: 
+_local_ds(24):
+	_local_ds(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [123]  = 0.021999597549438477
+**#**
+selected plan: 
+_local_ds(24):
+	_local_ds(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [125]  = 0.14000725746154785
+**#**
+selected plan: 
+_local_ds(24):
+	_local_ds(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [127]  = 0.18903446197509766
+**#**
+selected plan: 
+_local_ds(24):
+	_local_ds(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [128]  = 0.21500086784362793
+**#**
+selected plan: 
+_local_ds(24):
+	_local_ds(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [129]  = 0.300001859664917
+**#**
+selected plan: 
+_local_ds(24):
+	_local_ds(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [130]  = 0.02300548553466797
+**#**
+selected plan: 
+_local_ds(24):
+	_local_ds(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [131]  = 1.2159936428070068
+**#**
+selected plan: 
+_local_ds(65376.64):
+	_local_ds(0):
+		None
+		None
+	p1(62530.0):
+		_local_ds(0):
+			None
+			None
+		p1(0):
+			None
+			None
+**#**
+time for [132]  = 0.10896921157836914
+**#**
+selected plan: 
+p1(64401.0):
+	_local_ds(0):
+		None
+		None
+	p1(62530.0):
+		_local_ds(0):
+			None
+			None
+		p1(0):
+			None
+			None
+**#**
+time for [133]  = 0.05403542518615723
+**#**
+selected plan: 
+p1(64401.0):
+	_local_ds(0):
+		None
+		None
+	p1(62530.0):
+		_local_ds(0):
+			None
+			None
+		p1(0):
+			None
+			None
+**#**
+time for [134]  = 0.051996469497680664
+time for [135]  = 0.007995128631591797
+time for [136]  = 0.01001119613647461
+time for [137]  = 0.011188983917236328
+time for [138]  = 0.005814552307128906
+time for [139]  = 0.007991790771484375
+time for [140]  = 0.009000301361083984
+time for [141]  = 0.0060024261474609375
+time for [142]  = 0.008000612258911133
+**#**
+selected plan: 
+p1(7090.0):
+	_local_ds(0):
+		None
+		None
+	p1(7026.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [143]  = 0.07695627212524414
+**#**
+selected plan: 
+_local_ds(11147):
+	_local_ds(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [144]  = 0.06599950790405273
+**#**
+selected plan: 
+_local_ds(11147):
+	_local_ds(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [145]  = 0.0660257339477539
+**#**
+selected plan: 
+p1(1664.0):
+	_local_ds(0):
+		None
+		None
+	p1(1600.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [146]  = 0.23960351943969727
+**#**
+selected plan: 
+_local_ds(11147):
+	_local_ds(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [147]  = 0.08217239379882812
+**#**
+selected plan: 
+_local_ds(11147):
+	_local_ds(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [148]  = 0.06624913215637207
+**#**
+selected plan: 
+p1(704.0):
+	_local_ds(0):
+		None
+		None
+	p1(640.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [149]  = 0.0809624195098877
+**#**
+selected plan: 
+_local_ds(214890):
+	_local_ds(0):
+		None
+		None
+	_local_ds(214890):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [150]  = 0.11600494384765625
+**#**
+selected plan: 
+p1(960.0):
+	_local_ds(0):
+		None
+		None
+	p1(896.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [151]  = 0.06400084495544434
+**#**
+selected plan: 
+p1(1664.0):
+	_local_ds(0):
+		None
+		None
+	p1(1600.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [152]  = 0.07900047302246094
+**#**
+selected plan: 
+_local_ds(214890):
+	_local_ds(0):
+		None
+		None
+	_local_ds(214890):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [153]  = 0.0490415096282959
+**#**
+selected plan: 
+p1(5490.0):
+	_local_ds(0):
+		None
+		None
+	p1(5426.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [154]  = 0.07540583610534668
+**#**
+selected plan: 
+_local_ds(226037):
+	_local_ds(0):
+		None
+		None
+	_local_ds(226037):
+		p1(0):
+			None
+			None
+		_local_ds(11147):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [155]  = 0.1380000114440918
+**#**
+selected plan: 
+_local_ds(221281.2):
+	_local_ds(0):
+		None
+		None
+	_local_ds(221281.2):
+		p1(0):
+			None
+			None
+		p1(768.0):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [156]  = 0.21100211143493652
+**#**
+selected plan: 
+_local_ds(226037):
+	_local_ds(0):
+		None
+		None
+	_local_ds(226037):
+		p1(0):
+			None
+			None
+		_local_ds(11147):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [157]  = 0.14103150367736816
+**#**
+selected plan: 
+_local_ds(226037):
+	_local_ds(0):
+		None
+		None
+	_local_ds(226037):
+		p1(0):
+			None
+			None
+		_local_ds(11147):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [158]  = 0.16100311279296875
+**#**
+selected plan: 
+_local_ds(226037):
+	_local_ds(0):
+		None
+		None
+	_local_ds(226037):
+		p1(0):
+			None
+			None
+		_local_ds(11147):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [159]  = 0.13596320152282715
+**#**
+selected plan: 
+_local_ds(147405.2):
+	_local_ds(0):
+		None
+		None
+	p1(1280.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [160]  = 0.10903811454772949
+**#**
+selected plan: 
+_local_ds(105634.32):
+	_local_ds(0):
+		None
+		None
+	p1(768.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [161]  = 0.1410045623779297
+**#**
+selected plan: 
+_local_ds(176057.2):
+	_local_ds(0):
+		None
+		None
+	p1(1280.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [163]  = 0.11699843406677246
+**#**
+selected plan: 
+_local_ds(214890):
+	_local_ds(0):
+		None
+		None
+	_local_ds(214890):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [164]  = 0.05304265022277832
+**#**
+selected plan: 
+_local_ds(225453.68):
+	_local_ds(0):
+		None
+		None
+	_local_ds(225453.68):
+		p1(0):
+			None
+			None
+		p1(6014.0):
+			_local_ds(0):
+				None
+				None
+			p1(5886.0):
+				p1(0):
+					None
+					None
+				_local_ds(0):
+					None
+					None
+**#**
+time for [165]  = 0.14764165878295898
+**#**
+selected plan: 
+_local_ds(226037):
+	_local_ds(0):
+		None
+		None
+	_local_ds(226037):
+		p1(0):
+			None
+			None
+		_local_ds(11147):
+			_local_ds(0):
+				None
+				None
+			_local_ds(11147):
+				p1(0):
+					None
+					None
+				_local_ds(0):
+					None
+					None
+**#**
+time for [166]  = 0.14300036430358887
+**#**
+selected plan: 
+_local_ds(219446.976):
+	_local_ds(0):
+		None
+		None
+	_local_ds(219446.976):
+		p1(0):
+			None
+			None
+		p1(1216.0):
+			_local_ds(0):
+				None
+				None
+			p1(1088.0):
+				p1(0):
+					None
+					None
+				_local_ds(0):
+					None
+					None
+**#**
+time for [167]  = 0.14399933815002441
+**#**
+selected plan: 
+p1(1920.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [169]  = 0.03499555587768555
+time for [170]  = 0.010999679565429688
+**#**
+selected plan: 
+_local_ds(80000):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [171]  = 0.029999494552612305
+**#**
+selected plan: 
+p1(1920.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [172]  = 0.05600094795227051
+**#**
+selected plan: 
+p1(1920.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [173]  = 0.11521363258361816
+**#**
+selected plan: 
+p1(1920.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [174]  = 0.10778403282165527
+time for [175]  = 0.008962869644165039
+**#**
+selected plan: 
+_local_ds(224):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [176]  = 0.01703190803527832
+time for [177]  = 0.006999015808105469
+time for [178]  = 0.007004976272583008
+**#**
+selected plan: 
+p1(1920.0):
+	_local_ds(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [179]  = 0.09401178359985352
+time for [180]  = 0.007990837097167969
+time for [181]  = 0.00899505615234375
+time for [182]  = 0.014006376266479492
+time for [183]  = 0.012996435165405273
+time for [184]  = 0.012001514434814453
+time for [185]  = 0.012998580932617188
+time for [186]  = 0.014011383056640625
+time for [187]  = 0.01499032974243164
+time for [188]  = 0.009996175765991211
+time for [189]  = 0.01300358772277832
+time for [190]  = 0.013000011444091797
+**#**
+selected plan: 
+_local_ds(11147):
+	_local_ds(0):
+		None
+		None
+	_local_ds(11147):
+		_local_ds(0):
+			None
+			None
+		_local_ds(11147):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [191]  = 0.07500600814819336
+**#**
+selected plan: 
+_local_ds(7659.6):
+	_local_ds(0):
+		None
+		None
+	_local_ds(7659.6):
+		_local_ds(0):
+			None
+			None
+		p1(1440.0):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [193]  = 0.0859689712524414
+**#**
+selected plan: 
+_local_ds(5156.619999999999):
+	_local_ds(0):
+		None
+		None
+	p1(2939.9999999999995):
+		_local_ds(0):
+			None
+			None
+		p1(2811.9999999999995):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [196]  = 0.08968162536621094
+**#**
+selected plan: 
+_local_ds(10267.68):
+	_local_ds(0):
+		None
+		None
+	p1(4582.0):
+		_local_ds(0):
+			None
+			None
+		p1(4454.0):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [197]  = 0.23865842819213867
+**#**
+selected plan: 
+_local_ds(214890):
+	_local_ds(0):
+		None
+		None
+	_local_ds(214890):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [198]  = 0.06304311752319336
+**#**
+selected plan: 
+p1(3072.0):
+	_local_ds(0):
+		None
+		None
+	p1(1152.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [199]  = 10.628185510635376
+**#**
+selected plan: 
+_local_ds(226037):
+	_local_ds(0):
+		None
+		None
+	_local_ds(226037):
+		p1(0):
+			None
+			None
+		_local_ds(11147):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [204]  = 0.34495997428894043
+**#**
+selected plan: 
+_local_ds(214890):
+	_local_ds(0):
+		None
+		None
+	_local_ds(214890):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [209]  = 0.07800507545471191
+**#**
+selected plan: 
+_local_ds(214890):
+	_local_ds(0):
+		None
+		None
+	_local_ds(214890):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [210]  = 0.3430006504058838
+**#**
+selected plan: 
+p1(3200.0):
+	_local_ds(0):
+		None
+		None
+	p1(1280.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [211]  = 1.5901060104370117
+**#**
+selected plan: 
+p1(2880.0):
+	_local_ds(0):
+		None
+		None
+	p1(960.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [213]  = 1.0308330059051514
+**#**
+selected plan: 
+_local_ds(219287.6):
+	_local_ds(0):
+		None
+		None
+	_local_ds(219287.6):
+		p1(0):
+			None
+			None
+		p1(1728.0):
+			_local_ds(0):
+				None
+				None
+			p1(1600.0):
+				p1(0):
+					None
+					None
+				_local_ds(0):
+					None
+					None
+**#**
+time for [214]  = 0.3851473331451416
+**#**
+selected plan: 
+_local_ds(226037):
+	_local_ds(0):
+		None
+		None
+	_local_ds(226037):
+		p1(0):
+			None
+			None
+		_local_ds(11147):
+			_local_ds(0):
+				None
+				None
+			_local_ds(11147):
+				p1(0):
+					None
+					None
+				_local_ds(0):
+					None
+					None
+**#**
+time for [215]  = 0.31311702728271484
+**#**
+selected plan: 
+_local_ds(216487.8):
+	_local_ds(0):
+		None
+		None
+	_local_ds(216487.8):
+		p1(0):
+			None
+			None
+		_local_ds(1597.8):
+			_local_ds(0):
+				None
+				None
+			p1(192.0):
+				p1(0):
+					None
+					None
+				_local_ds(0):
+					None
+					None
+**#**
+time for [217]  = 0.277010440826416
+**#**
+selected plan: 
+p1(64450.0):
+	_local_ds(0):
+		None
+		None
+	p1(62530.0):
+		_local_ds(0):
+			None
+			None
+		p1(0):
+			None
+			None
+**#**
+time for [219]  = 52.193443059921265
+**#**
+selected plan: 
+p1(64450.0):
+	_local_ds(0):
+		None
+		None
+	p1(62530.0):
+		_local_ds(0):
+			None
+			None
+		p1(0):
+			None
+			None
+**#**
+time for [220]  = 0.8463525772094727
+**#**
+selected plan: 
+_local_ds(72359.3992):
+	_local_ds(0):
+		None
+		None
+	p1(62530.0):
+		_local_ds(0):
+			None
+			None
+		p1(0):
+			None
+			None
+**#**
+time for [221]  = 2.8455655574798584
+**#**
+selected plan: 
+_local_ds(65320.438):
+	_local_ds(0):
+		None
+		None
+	p1(62530.0):
+		_local_ds(0):
+			None
+			None
+		p1(0):
+			None
+			None
+**#**
+time for [222]  = 0.07416057586669922
+time for [223]  = 0.019998788833618164
+time for [224]  = 0.016997337341308594
+time for [225]  = 0.014011383056640625
+time for [226]  = 0.011989831924438477
+time for [227]  = 0.01199960708618164
+time for [228]  = 0.013999700546264648
+time for [229]  = 0.011003255844116211
+time for [230]  = 0.011996746063232422
+**#**
+selected plan: 
+_local_ds(11147):
+	_local_ds(0):
+		None
+		None
+	_local_ds(11147):
+		_local_ds(0):
+			None
+			None
+		_local_ds(11147):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [231]  = 0.07700276374816895
+**#**
+selected plan: 
+_local_ds(2305.96):
+	_local_ds(0):
+		None
+		None
+	p1(832.0):
+		_local_ds(0):
+			None
+			None
+		p1(768.0):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [232]  = 0.09310507774353027
+**#**
+selected plan: 
+_local_ds(11147):
+	_local_ds(0):
+		None
+		None
+	_local_ds(11147):
+		_local_ds(0):
+			None
+			None
+		_local_ds(11147):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [233]  = 0.07389354705810547
+**#**
+selected plan: 
+_local_ds(4035.4):
+	_local_ds(0):
+		None
+		None
+	p1(1664.0):
+		_local_ds(0):
+			None
+			None
+		p1(1600.0):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [236]  = 0.08803629875183105
+**#**
+selected plan: 
+_local_ds(214890):
+	_local_ds(0):
+		None
+		None
+	_local_ds(214890):
+		_local_ds(0):
+			None
+			None
+		_local_ds(214890):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [237]  = 0.3179619312286377
+**#**
+selected plan: 
+_local_ds(226037):
+	_local_ds(0):
+		None
+		None
+	_local_ds(226037):
+		_local_ds(0):
+			None
+			None
+		_local_ds(226037):
+			p1(0):
+				None
+				None
+			_local_ds(11147):
+				p1(0):
+					None
+					None
+				_local_ds(0):
+					None
+					None
+**#**
+time for [243]  = 0.30400967597961426
+**#**
+selected plan: 
+_local_ds(226037):
+	_local_ds(0):
+		None
+		None
+	_local_ds(226037):
+		_local_ds(0):
+			None
+			None
+		_local_ds(226037):
+			p1(0):
+				None
+				None
+			_local_ds(11147):
+				p1(0):
+					None
+					None
+				_local_ds(0):
+					None
+					None
+**#**
+time for [244]  = 0.31099867820739746
+**#**
+selected plan: 
+_local_ds(225792.36):
+	_local_ds(0):
+		None
+		None
+	_local_ds(225792.36):
+		_local_ds(0):
+			None
+			None
+		_local_ds(225792.36):
+			p1(0):
+				None
+				None
+			p1(2016.0):
+				p1(0):
+					None
+					None
+				_local_ds(0):
+					None
+					None
+**#**
+time for [245]  = 2.1178483963012695
+**#**
+selected plan: 
+_local_ds(222970.2):
+	_local_ds(0):
+		None
+		None
+	_local_ds(222970.2):
+		_local_ds(0):
+			None
+			None
+		_local_ds(222970.2):
+			p1(0):
+				None
+				None
+			p1(2811.9999999999995):
+				p1(0):
+					None
+					None
+				_local_ds(0):
+					None
+					None
+**#**
+time for [246]  = 0.5807161331176758
+**#**
+selected plan: 
+_local_ds(214890):
+	_local_ds(0):
+		None
+		None
+	_local_ds(214890):
+		_local_ds(0):
+			None
+			None
+		_local_ds(214890):
+			p1(0):
+				None
+				None
+			_local_ds(0):
+				None
+				None
+**#**
+time for [249]  = 0.10404276847839355
+**#**
+selected plan: 
+_local_ds(221531.2):
+	_local_ds(0):
+		None
+		None
+	_local_ds(221531.2):
+		_local_ds(0):
+			None
+			None
+		_local_ds(221531.2):
+			p1(0):
+				None
+				None
+			p1(1728.0):
+				_local_ds(0):
+					None
+					None
+				p1(1600.0):
+					p1(0):
+						None
+						None
+					_local_ds(0):
+						None
+						None
+**#**
+time for [255]  = 0.3400447368621826
+**#**
+selected plan: 
+p1(8426368.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [256]  = 80.10400247573853
+**#**
+selected plan: 
+p1(6399744.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [257]  = 21.446290493011475
+**#**
+selected plan: 
+p1(36544.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [258]  = 4.100701570510864
+**#**
+selected plan: 
+p1(3872.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [259]  = 26.04732394218445
+**#**
+selected plan: 
+_local_ds(538041560):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [260]  = 117.5587887763977
+**#**
+selected plan: 
+_local_ds(538462733):
+	p1(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [261]  = 77.05067563056946
+**#**
+selected plan: 
+p1(576.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [262]  = 4.247833967208862
+**#**
+selected plan: 
+_local_ds(538041560):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [263]  = 109.31552314758301
+**#**
+selected plan: 
+p1(10633310.543):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [264]  = 17.839577674865723
+**#**
+selected plan: 
+p1(3840.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [265]  = 4.2668538093566895
+**#**
+selected plan: 
+p1(0):
+	p1(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [266]  = 0.7430832386016846
+**#**
+selected plan: 
+_local_ds(538822734):
+	p1(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [267]  = 94.24296712875366
+**#**
+selected plan: 
+p1(0):
+	p1(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [268]  = 0.7899677753448486
+**#**
+selected plan: 
+_local_ds(538041560):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [269]  = 82.54203653335571
+**#**
+selected plan: 
+p1(96000.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [270]  = 19.045157432556152
+**#**
+selected plan: 
+p1(8128.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [271]  = 24.15878987312317
+**#**
+selected plan: 
+_local_ds(538406744):
+	p1(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [272]  = 75.00876998901367
+**#**
+selected plan: 
+_local_ds(538041560):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [273]  = 118.29470729827881
+**#**
+selected plan: 
+_local_ds(539359911):
+	p1(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [274]  = 112.9873948097229
+**#**
+selected plan: 
+p1(1337536.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [275]  = 35.58307147026062
+**#**
+selected plan: 
+_local_ds(539411423):
+	p1(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [276]  = 112.20371842384338
+**#**
+selected plan: 
+_local_ds(538041560):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [277]  = 77.57263612747192
+**#**
+selected plan: 
+p1(320.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [278]  = 23.91893172264099
+**#**
+selected plan: 
+p1(0):
+	p1(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [279]  = 39.10587215423584
+**#**
+selected plan: 
+p1(3840.0):
+	p1(0):
+		None
+		None
+	_local_ds(0):
+		None
+		None
+**#**
+time for [280]  = 23.019386529922485
+**#**
+selected plan: 
+_local_ds(539028097):
+	p1(0):
+		None
+		None
+	p1(0):
+		None
+		None
+**#**
+time for [281]  = 99.99351692199707
+**#**
+selected plan: 
+p1(114870.09202):
+	p1(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [282]  = 3.8226492404937744
+**#**
+selected plan: 
+p1(576.0):
+	p1(0):
+		None
+		None
+	p1(576.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [283]  = 0.368410587310791
+**#**
+selected plan: 
+p1(11368.99854):
+	p1(0):
+		None
+		None
+	_local_ds(11147):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [284]  = 3.558419704437256
+**#**
+selected plan: 
+p1(1120.0):
+	p1(0):
+		None
+		None
+	p1(1120.0):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [285]  = 0.6285467147827148
+**#**
+selected plan: 
+p1(50.400000000000006):
+	p1(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [286]  = 3.4913647174835205
+**#**
+selected plan: 
+p1(131.51999999999998):
+	p1(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [287]  = 2.814990520477295
+**#**
+selected plan: 
+p1(56.0):
+	p1(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [288]  = 3.0811610221862793
+**#**
+selected plan: 
+p1(5943.948200000001):
+	p1(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [289]  = 3.737338066101074
+**#**
+selected plan: 
+p1(50.400000000000006):
+	p1(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [290]  = 2.449741840362549
+**#**
+selected plan: 
+p1(112.16):
+	p1(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [291]  = 2.6691949367523193
+**#**
+selected plan: 
+p1(150.72):
+	p1(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [292]  = 2.955094337463379
+**#**
+selected plan: 
+p1(584.2284000000001):
+	p1(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
+time for [293]  = 3.495215654373169
+**#**
+selected plan: 
+p1(194.67399999999998):
+	p1(0):
+		None
+		None
+	_local_ds(24):
+		p1(0):
+			None
+			None
+		_local_ds(0):
+			None
+			None
+**#**
