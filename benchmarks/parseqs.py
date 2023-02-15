@@ -79,17 +79,16 @@ def breakQryToSteps(qry):
         if suffix == 0:
             assert sub_count == 0
             qry_steps.append(f"{dfname}_{suffix} = {new_str}")
-            qry_steps.append(f"{dfname}_{suffix}.materialize()")
         else:
             # if no previous complete sub query is available, directly use the substituted new command
             # otherwise, need to connect to the previous df
-            if suffix == sub_count:
+            if start == 0 or s[start-1] != '.':
                 qry_steps.append(f"{dfname}_{suffix} = {new_str}")
             else:
                 qry_steps.append(f"{dfname}_{suffix} = {dfname}_{suffix-sub_count-1}.{new_str}")
 
-            if not last:
-                qry_steps.append(f"{dfname}_{suffix}.materialize()")
+        if not last:
+            qry_steps.append(f"{dfname}_{suffix}.materialize()")
 
     # Go through each subqry and properly format it
     for idx, c in enumerate(rhs):

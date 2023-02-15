@@ -117,3 +117,18 @@ if __name__ == "__main__":
         run_one_dist('p1', table_list, rpath, wpath, wlogpath)
 
 
+
+"""
+df170_0 = supplier[(supplier['s_nationkey'] == 31) | (supplier['s_suppkey'] <= 13) & (supplier['s_nationkey'] == 14) & (supplier['s_nationkey'] < 25)][['s_suppkey','s_address','s_nationkey','s_phone']].groupby(by=['s_phone'])
+
+df170_0.materialize()
+
+df170_1 = df170_0.agg('max', numeric_only=True).merge(nation[(nation['n_nationkey'] > 18) | (nation['n_regionkey'] <= 2)],left_on='s_nationkey', right_on='n_nationkey')
+
+df170_0 = supplier[(supplier['s_nationkey'] == 31) | (supplier['s_suppkey'] <= 13) & (supplier['s_nationkey'] == 14) & (supplier['s_nationkey'] < 25)][['s_suppkey','s_address','s_nationkey','s_phone']].groupby(by=['s_phone'])
+
+df170_0.materialize()
+
+df170_1 = df170_0.agg('max', numeric_only=True).merge(nation[(nation['n_nationkey'] > 18) | (nation['n_regionkey'] <= 2)],left_on='s_nationkey', right_on='n_nationkey').materialize()
+tuple index out of range
+"""

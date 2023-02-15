@@ -78,7 +78,7 @@ def output_size(df):
 
 def collect_stats(job, table_list, opath, id):
     rpath = f'{opath}/merged_queries_auto_sf0001.txt'
-    logpath = f'{opath}/out_{id}_log.txt'
+    logpath = f'{opath}/out_{id}_meta.txt'
     query_stats_log = f'{opath}/query_input_size_{id}.csv'
     locals, remotes = read_specs(logpath)
 

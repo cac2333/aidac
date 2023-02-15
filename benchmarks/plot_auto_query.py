@@ -18,9 +18,9 @@ def plot_hist(df, title, range_min):
     # plt.hist(df['pd_time'], bins=50, alpha=0.45, color='blue', log=True)
     binrange = (0, max(df['lad_time'].max(), df['pd_time'].max()))
     ax = sns.histplot(data=df['lad_time'],  label='runtime',  color='#f0958f', element='step',
-                 stat='count', binwidth=.4, binrange=binrange)
+                 stat='count', binwidth=.4, binrange=binrange, alpha=.4)
     sns.histplot(data=df['pd_time'],  label='runtime',  color='skyblue', element='step',
-                 stat='count',  binwidth=.4, binrange=binrange)
+                 stat='count',  binwidth=.4, binrange=binrange, alpha=.4)
     ax.set(xlabel='runtime', ylabel='count')
 
     plt.title(title)
@@ -36,7 +36,7 @@ def plot_scatter(df, title):
     def round_result(x, y):
         return round(x / y, 2)
 
-    df['size_ratio'] = df.apply(lambda x: round_result(x['local_size'], x['remote_size']), axis=1)
+    df['size_ratio'] = df.apply(lambda x: round_result(x['local_size'], x['total_size']), axis=1)
     data = df[['pd_time', 'lad_time', 'size_ratio']]
     dfm = data.melt('size_ratio', var_name='method', value_name='runtime')
 
@@ -46,8 +46,8 @@ def plot_scatter(df, title):
 
     ax = sns.catplot(x="size_ratio",
                      y="runtime", data=dfm, hue='method', legend=True,
-                     palette=['skyblue', '#f0958f'],alpha=.3)
-    ax.set(ylabel='runtime', xlabel='local input size / remote input size')
+                     palette=['skyblue', '#f0958f'],alpha=.4)
+    ax.set(ylabel='runtime', xlabel='local input size / total input size')
     # ax.set_xticklabels(ax.get_xticklabels(), rotation=30)
     plt.xticks(rotation=45)
     plt.title(title)
@@ -69,7 +69,8 @@ if __name__ == '__main__':
         pd_df = pd.read_csv(pd_prefix.format(idx), names=['id', 'pd_time'], header=None)
         pd_dfs.append(pd_df)
 
-        input_df = pd.read_csv(input_size_prefix.format(idx), names=['id', 'local_size', 'remote_size', 'total_size'], header=None)
+        input_df = pd.read_csv(input_size_prefix.format(idx), names=['id', 'local_size', 'remote_size', 'total_size'],
+                               header=None)
         input_dfs.append(input_df)
 
         combined_dfs.append(lad_df.merge(pd_df, on='id', how='inner').merge(input_df, on='id', how='inner'))
@@ -80,13 +81,19 @@ if __name__ == '__main__':
 
     # plot histogram
     plot_hist(all_cleaned, 'All data combined', 0)
-    plot_scatter(all_cleaned, 'Runtime vs local/remote table size')
 
     for id, df in zip(index_range, cleaned_dfs):
         plot_hist(df, f'Distribution {id} (for all)', 5)
         # plot_hist(df, f'Distribution {id} (>5)', 5)
         plot_scatter(df, f'Distribution {id}')
+        plot_scatter(df, f'Runtime vs local/total table size for {id}')
 
 
 
-    #todo: have a summary of the LAD plans, percentage/stats of the queries
+    # todo: have a summary of the LAD plans, percentage/stats of the queries
+    # show the figures
+    # change a template, mcgill thesis
+    # increase SF for one approach ()
+    # purpose of using the randomly generated queries (large scale experiments),
+    # effects of increasing datasets,
+    # merge the experiments and discussion together, tell the story
