@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-index_range = [0, 2, 3]
+index_range = [3]
 path = 'auto_gen_queries/'
 lad_prefix = path + 'out_{}.txt'
 pd_prefix = path + 'out_{}_pd.txt'
@@ -16,14 +16,28 @@ def plot_hist(df, title, range_min):
     # plotting two histograms on the same axis
     # plt.hist(df['lad_time'], bins=50, alpha=0.45, color='red', log=True)
     # plt.hist(df['pd_time'], bins=50, alpha=0.45, color='blue', log=True)
-    binrange = (0, max(df['lad_time'].max(), df['pd_time'].max()))
-    ax = sns.histplot(data=df['lad_time'],  label='runtime',  color='#f0958f', element='step',
+    max_range = max(df['lad_time'].max(), df['pd_time'].max())
+    binrange = (0, max_range)
+
+    fig, ax = plt.subplots()
+
+    ax = sns.histplot(data=df['lad_time'],  label='runtime',  color='#f0958f', element='step', ax=ax,
                  stat='count', binwidth=.4, binrange=binrange, alpha=.4)
-    sns.histplot(data=df['pd_time'],  label='runtime',  color='skyblue', element='step',
+    sns.histplot(data=df['pd_time'],  label='runtime',  color='skyblue', element='step', ax=ax,
                  stat='count',  binwidth=.4, binrange=binrange, alpha=.4)
     ax.set(xlabel='runtime', ylabel='count')
 
-    plt.title(title)
+    ax2 = plt.axes([.45, .4, .38, .38], facecolor='seashell')
+    sns.histplot(data=df['lad_time'], label='runtime', color='#f0958f', element='step', ax=ax2,
+                 stat='count', binwidth=.4, binrange=binrange, alpha=.4)
+    sns.histplot(data=df['pd_time'], label='runtime', color='skyblue', element='step', ax=ax2,
+                 stat='count', binwidth=.4, binrange=binrange, alpha=.4)
+    ax2.set_title('zoom')
+    ax2.set(xlabel='runtime', ylabel='count')
+    ax2.set_xlim([6, max_range + 1])
+    ax2.set_ylim([0, 5])
+
+    ax.set_title(title)
 
     plt.legend(['LAD',
                 'Pandas'])

@@ -79,17 +79,19 @@ def output_size(df):
 def collect_stats(job, table_list, opath, id):
     rpath = f'{opath}/merged_queries_auto_sf0001.txt'
     logpath = f'{opath}/out_{id}_meta.txt'
-    query_stats_log = f'{opath}/query_input_size_{id}.csv'
+    query_size_log = f'{opath}/query_input_size_{id}.csv'
+    query_gen_stats = f'{opath}/query_stats.csv'
     locals, remotes = read_specs(logpath)
 
     # start index, end index and step for iterating the queries
-    sc, ec, step = 0, 3000, 10
+    sc, ec, step = 0, 3000, 1
     # total query count and number of errors
     idx, err_count = 0, 0
 
     queries = read_auto_gen_queries(rpath)[sc:ec:step]
     indexes = range(sc, ec, step)
-    all_query_stats = []
+    all_qsizes = []
+    all_stats = []
 
     for cmd in queries:
         # find the remote tables
@@ -104,15 +106,23 @@ def collect_stats(job, table_list, opath, id):
                 local_size += table_size[tb] * SF
         total_size = local_size + remote_size
 
-        stats = [indexes[idx], local_size, remote_size, total_size]
+        qsize = [indexes[idx], local_size, remote_size, total_size]
 
-        all_query_stats.append(stats)
+        all_qsizes.append(qsize)
+
+        stats = extract_query_meta(cmd)
+        stats.insert(0, indexes[idx])
+        all_stats.append(stats)
         # writer.writerow([indexes[idx], times[idx]])
         idx += 1
 
-    with open(query_stats_log, 'w') as qf:
+    with open(query_gen_stats, 'w') as qf:
         writer = csv.writer(qf)
-        writer.writerows(all_query_stats)
+        writer.writerows(all_stats)
+
+    with open(query_size_log, 'w') as qf:
+        writer = csv.writer(qf)
+        writer.writerows(all_qsizes)
 
 
 if __name__ == "__main__":

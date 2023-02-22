@@ -3,9 +3,9 @@ table_dist = {
     'mini_01': [([], ['lineitem'])],
     'mini_02': [([], ['orders'])],
     'mini_03': [
-         # (['orders', 'lineitem'], []),
+         (['orders', 'lineitem'], []),
                 ([], ['orders', 'lineitem']),
-                 # (['lineitem'], ['orders'])
+                 (['lineitem'], ['orders'])
         ],
     'mini_04': [],
     'mini_05': [
@@ -16,6 +16,23 @@ table_dist = {
                 (['part'], ['nation', 'partsupp', 'supplier', 'region']),
                 (['partsupp', 'supplier'], ['part', 'nation', 'region']),
                 ([], ['part', 'nation', 'partsupp', 'supplier', 'region'])
+    ],
+    'q_02_v1': [
+        (['part', 'nation'], ['partsupp', 'supplier', 'region']),
+        (['part'], ['nation', 'partsupp', 'supplier', 'region']),
+        (['partsupp', 'supplier'], ['part', 'nation', 'region']),
+        ([], ['part', 'nation', 'partsupp', 'supplier', 'region'])
+    ],
+    'q_04_v1': [
+        (['customer'], ['orders', 'lineitem']),
+        (['customer', 'orders'], ['lineitem']),
+        (['lineitem', 'orders'], ['customer'])
+    ],
+    'q_05_v1':[
+        (['orders', 'supplier', 'region'], ['customer', 'nation', 'lineitem']),
+        (['lineitem', 'orders', 'region'], ['customer', 'nation', 'supplier']),
+        (['customer', 'nation', 'lineitem', 'supplier', 'region'], ['orders']),
+        (['nation', 'supplier'], ['customer', 'region', 'orders', 'lineitem'])
     ],
     'q_10_v1': [(['orders'], ['customer', 'nation', 'lineitem']),
                 (['lineitem', 'orders'], ['customer', 'nation']),
@@ -37,7 +54,7 @@ table_dist = {
                 ([], ['part', 'lineitem'])
     ],
     'q_15_v1': [
-        # (['part'], ['lineitem']),
+        (['part'], ['lineitem']),
         (['lineitem'], ['part']),
         # ([], ['part', 'lineitem'])
     ],

@@ -38,7 +38,8 @@ def local_frame_wrapper(func):
             else:
                 pd_func = getattr(self.data, func_name)
             pdf = pd_func(*args, **kwargs)
-            return DataFrame(pdf, ds=local_ds)
+            # for inplace op, pdf will be None, then we use the original data
+            return DataFrame(pdf if pdf is not None else self.data, ds=local_ds)
         else:
             df = func(self, *args, **kwargs)
             df.source_table = self.source_table
@@ -372,27 +373,37 @@ class DataFrame:
 
     @local_frame_wrapper
     def count(self):
-        trans = SQLAGG_Transform(self, func='count', collist=self.columns.keys())
+        if hasattr(self, 'transform') and isinstance(self.transform, SQLGroupByTransform):
+            proj_cols = self.columns.keys() - self.transform._groupcols_
+        trans = SQLAGG_Transform(self, func='count', collist=proj_cols, numeric_only=False)
         return DataFrame(ds=self.data_source, transform=trans)
 
     @local_frame_wrapper
     def sum(self):
-        trans = SQLAGG_Transform(self, func='sum', collist=self.columns.keys())
+        if hasattr(self, 'transform') and isinstance(self.transform, SQLGroupByTransform):
+            proj_cols = self.columns.keys() - self.transform._groupcols_
+        trans = SQLAGG_Transform(self, func='sum', collist=proj_cols, numeric_only=False)
         return DataFrame(ds=self.data_source, transform=trans)
 
     @local_frame_wrapper
     def mean(self):
-        trans = SQLAGG_Transform(self, func='avg', collist=self.columns.keys())
+        if hasattr(self, 'transform') and isinstance(self.transform, SQLGroupByTransform):
+            proj_cols = self.columns.keys() - self.transform._groupcols_
+        trans = SQLAGG_Transform(self, func='avg', collist=proj_cols, numeric_only=False)
         return DataFrame(ds=self.data_source, transform=trans)
 
     @local_frame_wrapper
     def min(self):
-        trans = SQLAGG_Transform(self, func='min', collist=self.columns.keys())
+        if hasattr(self, 'transform') and isinstance(self.transform, SQLGroupByTransform):
+            proj_cols = self.columns.keys() - self.transform._groupcols_
+        trans = SQLAGG_Transform(self, func='min', collist=proj_cols, numeric_only=False)
         return DataFrame(ds=self.data_source, transform=trans)
 
     @local_frame_wrapper
-    def max(self):
-        trans = SQLAGG_Transform(self, func='max', collist=self.columns.keys())
+    def max(self, numeric_only=False):
+        if hasattr(self, 'transform') and isinstance(self.transform, SQLGroupByTransform):
+            proj_cols = self.columns.keys() - self.transform._groupcols_
+        trans = SQLAGG_Transform(self, func='max', collist=self.columns.keys(), numeric_only=numeric_only)
         return DataFrame(ds=self.data_source, transform=trans)
 
     def to_dict(self, orient, into):
@@ -510,6 +521,7 @@ class DataFrame:
 
     @binary_op_local_frame_wrapper
     def __and__(self, other):
+        # todo: other is contain str
         if isinstance(other, DataFrame) and isinstance(other.transform, SQLFilterTransform):
             trans = SQLFilterTransform(self, 'AND', other)
             return DataFrame(ds=self.data_source, transform=trans)
@@ -643,6 +655,18 @@ class DataFrame:
         self.data[key] = vs
         return DataFrame(data=self.data, ds=local_ds)
 
+    def _deprieve_col_exp(self, columns):
+        """
+        Remove all the stored column expression or agg function from the columns
+        @param columns: deep copied columns
+        @return:
+        """
+        for c in columns:
+            # need to assign srccol as it will be used in genSQL if column_expr is None
+            if columns[c].column_expr is not None:
+                columns[c].column_expr = None
+                columns[c].srccol = [c]
+
     def project(self, key, val):
         """
         @param key: column name
@@ -666,6 +690,7 @@ class DataFrame:
         self._validate_input_column_size(key, val)
 
         all_cols = copy.deepcopy(self.columns)
+        self._deprieve_col_exp(all_cols)
         force_local = False
 
         # save the original key value pair for saved args

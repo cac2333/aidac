@@ -14,7 +14,7 @@ _PATH = getattr(config, 'local_data_path')
 date_columns = getattr(config, 'date_columns')
 db_config = getattr(config, 'db_config')
 
-with_materialization = True
+with_materialization = False
 use_existing_meta = True
 
 
@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
     query_path = 'auto_gen_queries'
 
-    for id in range(0, 1):
+    for id in range(3, 4):
         random.seed(id*10)
         if with_materialization:
             rpath = f'{query_path}/auto_materialization/'

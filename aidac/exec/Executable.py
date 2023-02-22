@@ -158,7 +158,6 @@ class Executable:
             func = getattr(data, df._saved_func_name_)
             # print(df._saved_args_)
             # print(data.columns)
-            # todo: projection list saved args
             # if isinstance(df.transform, SQLProjectionTransform):
             #     data = func(df._saved_args_, **df._saved_kwargs_)
             # else:
@@ -166,7 +165,7 @@ class Executable:
             for idx, arg in enumerate(df._saved_args_):
                 from aidac.dataframe.frame import DataFrame
                 if isinstance(arg, DataFrame):
-                    # todo: happens only at project. Based on current impl, this has to be local
+                    # happens only at project. Based on current impl, this has to be local
                     updated_args[idx] = self.perform_local_operation(arg)
             df._saved_args_ = updated_args if updated_args else df._saved_args_
 

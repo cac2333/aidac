@@ -187,12 +187,21 @@ class PostgreDataSource(DataSource):
 
     def _execute(self, qry, *args) -> ResultSet | None:
         start = time.time()
-        self.__cursor.execute(qry, args)
-        if self.__cursor.description is not None:
-            # as no record returned for insert, update queries
-            # todo: change column type here
-            rs = ResultSet(self.__cursor.description, self.__cursor.fetchall())
-            # print(f'query takes time {time.time() - start}')
-            return rs
-        self.__conn.commit()
+        try:
+            self.__cursor.execute(qry, args)
+            if self.__cursor.description is not None:
+                # as no record returned for insert, update queries
+                # todo: change column type here
+                rs = ResultSet(self.__cursor.description, self.__cursor.fetchall())
+                # print(f'query takes time {time.time() - start}')
+                return rs
+            self.__conn.commit()
+        except psycopg.errors.DatabaseError as err:
+            print(f'An error is thrown when executing the following query:\n{qry}')
+            print(err)
+            print('will rollback shortly...')
+            self.__conn.rollback()
+
         return None
+
+

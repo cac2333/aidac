@@ -242,15 +242,18 @@ class SQLBinaryOperationTransform(SQLTransform):
     assume the operands are validated
     we store the operation on table's column with the new column's column_expr (could be multiple)
     If the previous operation is also binary, we concatenate them together in column's expr
+    
+    note: the column_expr will be reset (to None) only when the column is assigned to a new column 
+    i.e. df[new_col] = ...
     """
     def _col_exp(self, col):
         col_exp = col.column_expr if col.column_expr else col.full_name()
         if self._is_num_:
             # single column operation
             if self._reverse_:
-                exp = '(' + col_exp + self.op + str(self._other_)+')'
-            else:
                 exp = '(' + str(self._other_) + self.op + col_exp + ')'
+            else:
+                exp = '(' + col_exp + self.op + str(self._other_)+')'
             return exp
         else:
             # todo: add multi column operation
@@ -262,28 +265,57 @@ class SQLBinaryOperationTransform(SQLTransform):
                 other_text = ocol.column_expr
             else:
                 other_text = ocol.full_name()
+            # todo: append srccol?
+            col.srccol = [ocol_name, col.name]
 
-            # should not worry about the reverse operation
-            return '('+other_text + self.op + col_exp+')'
+            if self._reverse_:
+                return '('+other_text + self.op + col_exp+')'
+            else:
+                return '(' + col_exp + self.op + other_text + ')'
+
 
     @property
     def columns(self):
         if not self._columns_:
             # if the source is a table, then we operate on its columns
             # if the source is another binaryOperation, then
-            srccols = super().columns
+            srccols = copy.deepcopy(super().columns)
             self._columns_ = {}
             for idx, col_name in enumerate(srccols):
                 # todo: update column name
                 col = srccols[col_name]
-                # need to assign table name before column expression
                 col.column_expr = self._col_exp(col)
-                self._columns_[f'{self.temp_prefix}_{idx}'] = col
+                # col.name = f'{self.temp_prefix}_{idx}'
+                self._columns_[col.name] = col
         return self._columns_
 
 
     def _partial_sql(self):
-        return self._source_.genSQL
+        if hasattr(self._source_, 'transform') and isinstance(self._source_.transform, SQLBinaryOperationTransform):
+            return self._source_.transform._partial_sql()
+        else:
+            return self._source_.genSQL
+
+    def _find_the_common_ancestor(self):
+        # this assumes the two operand are from the same base table, otherwise a join is required
+        source = self._source_
+        for col_name in self.columns:
+            col = self.columns[col_name]
+            while (hasattr(source, 'transform')):
+                # if the source column is not in source, we iterate to further ancestor util we find the source that contains all the source columns
+                count = 0
+                for src_col in col.srccol:
+                    # todo: track the src of other columns
+                    # if hasattr(self._other_, 'columns') and src_col in self._other_.columns:
+                    #     count += 1
+                    # else:
+                    if src_col in source.columns:
+                        count += 1
+                if count == len(col.srccol):
+                    break
+                source = source.transform.sources()
+        return source
+
 
     @property
     def genSQL(self):
@@ -295,7 +327,8 @@ class SQLBinaryOperationTransform(SQLTransform):
 
         if hasattr(self._source_, 'transform') and isinstance(self._source_.transform, SQLBinaryOperationTransform):
             # source table is used to provide proj column information, use source.source's sql (src.transform.partial sql)
-            return 'SELECT ' + projcoltxt + ' FROM (' + self._source_.transform._partial_sql() + ') ' + self._source_.table_name
+            ancestor = self._find_the_common_ancestor()
+            return 'SELECT ' + projcoltxt + ' FROM (' + ancestor.genSQL + ') ' + ancestor.table_name
         else:
             return 'SELECT ' + projcoltxt + ' FROM (' + self._source_.genSQL + ') ' + self._source_.table_name
 
@@ -441,7 +474,7 @@ class SQLJoinTransform(SQLTransform):
                             isinstance(self._src1joincols_, str)
                             and c.name == self._src1joincols_ and c.name == self._src2joincols_) \
                             or (isinstance(self._src1joincols_,
-                                           list) and c.name in self._src1joincols_ and c.name in self._src2joincols
+                                           list) and c.name in self._src1joincols_ and c.name in self._src2joincols_
                     ):
                         # if the name is common in two tables and not the join table, we give it a suffix
                         proj_name = c.name + suffix
@@ -1201,7 +1234,7 @@ class SQLApply(SQLTransform):
 
 class SQLAGG_Transform(SQLTransform):
 
-    def __init__(self, source, func, collist, numeric_only):
+    def __init__(self, source, func, collist, numeric_only=False):
         super().__init__(source)
 
         self._table_name_ = None
@@ -1230,9 +1263,16 @@ class SQLAGG_Transform(SQLTransform):
             for by in source.transform._groupcols_:
                 srccol, projcoln, coltransform = by, by, None
                 column = self._construct_col(src_cols, srccol, projcoln, coltransform, str(source))
+                # if the column name is already in the columns, that means the column is both groupby col and agg col
+                # we then rename the agg col
+                if projcoln in columns:
+                    new_name = columns[projcoln].agg_func + '_' + columns[projcoln].name
+                    columns[projcoln].name = new_name
+                    columns[new_name] = columns[projcoln]
                 columns[projcoln] = column
                 colcount += 1
             return columns, colcount
+        return columns, colcount
 
     def _convert_agg_name(self, op):
         # todo: move this to data source?
@@ -1293,7 +1333,7 @@ class SQLAGG_Transform(SQLTransform):
 
                     for operation in operations:
                         srccol, projcoln, coltransform = _get_new_col(col, operation)
-                        if len(operations) > 1:
+                        if len(operations)>1:
                             projcoln = operation + '_' + projcoln
                         column = self._construct_col(src_cols, srccol, projcoln, coltransform, str(source))
                         column.agg_func = operation
