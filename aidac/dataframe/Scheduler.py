@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import weakref
 from collections.abc import Iterable
+import logging
 
 from aidac.data_source.DataSourceManager import manager
 from aidac.common.meta import MetaInfo
 import aidac.dataframe.frame as frame
 from aidac.exec.Executable import *
 
-LOCAL_DS = '_local'
 
+LOCAL_DS = '_local'
+logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
 def is_local(df1: frame.DataFrame, df2: frame.DataFrame):
     """
@@ -75,7 +77,7 @@ class Scheduler:
         root_ex = RootExecutable()
         root_ex.add_prereq(ex)
         my_plan = root_ex.plan()
-        print(f'**#**\nselected plan: \n{my_plan}\n**#**')
-        # print(f'planning takes time {time.time()-start}')
+        logging.debug(f'**#**\nselected plan: \n{my_plan}\n**#**')
+        # logging.debug(f'planning takes time {time.time()-start}')
         return root_ex.process()
 

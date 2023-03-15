@@ -1010,16 +1010,16 @@ class SQLFilterTransform(SQLTransform):
         return self._columns_
 
     def is_int(self, o):
-        return isinstance(o, int)
+        return isinstance(o, int) or in_type(o, int)
 
     def is_string(self, o):
-        return isinstance(o, str)
+        return isinstance(o, str) or in_type(o, str)
 
     def is_float(self, o):
-        return "float" in str(o)
+        return "float" in str(o) or in_type(o, FloatType)
 
     def is_date_time(self, o):
-        return isinstance(o, datetime.date) or isinstance(o, np.datetime64)
+        return 'date' in str(o) or 'date' in str(type(o))
 
     def is_same_type_generic(self, o1, o2):
         """
@@ -1031,16 +1031,16 @@ class SQLFilterTransform(SQLTransform):
         same_type_flag = True
         if is_type(o2, ArrayLike):
             for o in o2:
-                same_type_flag = same_type_flag & self.is_same_type(o, o1)
+                same_type_flag = same_type_flag & self.is_same_type(type(o), o1)
         else:
-            same_type_flag = self.is_same_type(o2, o1)
+            same_type_flag = self.is_same_type(type(o2), o1)
         return same_type_flag
 
     def is_same_type(self, o1, o2):
         if self.is_date_time(o1):
             return "date" in str(o2)
-        if is_type(o1, NumericTypes):
-            return in_type(o2, NumericTypes)
+        if is_type(o1, NumericTypes) or in_type(o2, NumericTypes):
+            return in_type(o2, NumericTypes) or is_type(o2, NumericTypes)
         if self.is_int(o1):
             return "int" in str(o2)
         if self.is_float(o1):

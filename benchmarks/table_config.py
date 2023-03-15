@@ -21,7 +21,7 @@ table_dist = {
         (['part', 'nation'], ['partsupp', 'supplier', 'region']),
         (['part'], ['nation', 'partsupp', 'supplier', 'region']),
         (['partsupp', 'supplier'], ['part', 'nation', 'region']),
-        ([], ['part', 'nation', 'partsupp', 'supplier', 'region'])
+        (['partsupp', 'supplier', 'region'], ['part', 'nation'])
     ],
     'q_04_v1': [
         (['customer'], ['orders', 'lineitem']),
@@ -41,8 +41,8 @@ table_dist = {
     'q_13_v1': [
                 (['customer'], ['orders']),
                 (['orders'], ['customer']),
-                ([], ['orders', 'customer']),
-                (['orders', 'customer'], [])
+                # ([], ['orders', 'customer']),
+                # (['orders', 'customer'], [])
     ],
     'q_03_v1': [
                 (['orders'], ['lineitem', 'customer']),
@@ -51,13 +51,24 @@ table_dist = {
     'q_14_v1': [
                 (['lineitem'], ['part']),
                 (['part'], ['lineitem']),
-                ([], ['part', 'lineitem'])
+                # ([], ['part', 'lineitem'])
     ],
     'q_15_v1': [
         (['part'], ['lineitem']),
         (['lineitem'], ['part']),
         # ([], ['part', 'lineitem'])
     ],
+    'q_17_v1': [
+        (['part'], ['lineitem']),
+        (['lineitem'], ['part']),
+        # ([], ['part', 'lineitem'])
+    ],
+
+    'q_18_v1': [
+        (['customer'], ['lineitem', 'orders']),
+        (['lineitem', 'orders'], ['customer'])
+    ],
+
     'random_01': [
         (['supplier'], ['lineitem', 'partsupp']),
     ]
@@ -85,6 +96,8 @@ db_config = {
 #     'user': 'sf01',
 #     'passwd': 'sf01'
 # }
+
+large_rs = [2986, 2981, ]
 
 local_data_path = '../datasets/'
 # local_data_path = '../datasets/sf04/'

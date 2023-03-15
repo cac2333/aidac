@@ -1,3 +1,4 @@
+import csv
 import datetime
 import time
 import traceback
@@ -58,8 +59,10 @@ def read_tables(local_tbs, remote_tbs):
         else:
             all_tbs[p] = read_file(p)
     for p in remote_tbs:
+        start = time.time()
         all_tbs[p] = my_db.get_table(p)
-
+        tm = time.time() - start
+        print(f'reading {p} takes {tm}')
     for tb in all_tbs:
         all_tbs[tb] = date_conversion(all_tbs[tb], tb)
     return all_tbs
@@ -148,6 +151,38 @@ def q_01_v2(db):
     l.sort_values(['l_returnflag', 'l_linestatus'], inplace=True)
     return l
 
+def q_02_v1(locs, remotes):
+    tbs = read_tables(locs, remotes)
+    p = tbs['part']
+    ps = tbs['partsupp']
+    n = tbs['nation']
+    s = tbs['supplier']
+    r = tbs['region']
+
+    p = p[p['p_size'] == 15]
+    p = p[p['p_type'].str.contains('^.*BRASS$')]
+    p = p[['p_partkey', 'p_mfgr']]
+    ps = ps[['ps_suppkey', 'ps_supplycost', 'ps_partkey']]
+
+    s = s[['s_nationkey', 's_suppkey', 's_acctbal', 's_name', 's_address', 's_phone', 's_comment']]
+    n = n[['n_nationkey', 'n_regionkey', 'n_name']]
+    r = r[r['r_name'] == 'EUROPE']
+    r = r[['r_regionkey']]
+
+    j = ps.merge(s, left_on='ps_suppkey', right_on='s_suppkey')
+    j = j.merge(n, left_on='s_nationkey', right_on='n_nationkey')
+    j = j.merge(r, left_on='n_regionkey', right_on='r_regionkey')
+
+    ti = j[['ps_partkey', 'ps_supplycost']].groupby('ps_partkey').min()
+    ti.reset_index(inplace=True)
+    # ti.rename(columns={'ps_supplycost': 'min_supply_cost', 'ps_partkey': 'i_partkey'}, inplace=True)
+
+    t = j.merge(p, left_on='ps_partkey', right_on='p_partkey')
+    t = t.merge(ti, left_on=['ps_partkey', 'ps_supplycost'], right_on=['ps_partkey', 'ps_supplycost'])
+    t = t[['s_acctbal', 's_name', 'n_name', 'p_partkey', 'p_mfgr', 's_address', 's_phone', 's_comment']]
+    t.sort_values(['s_acctbal', 'n_name', 's_name', 'p_partkey'], ascending=[False, True, True, True])
+
+    return t
 
 def q_03_v1(locs, remotes):
     tbs = read_tables(locs, remotes)
@@ -169,6 +204,53 @@ def q_03_v1(locs, remotes):
     t = t.groupby(['l_orderkey', 'o_orderdate', 'o_shippriority'], sort=False).agg({'revenue': 'sum'})
     return t
 
+def q_04_v1(locs, remotes):
+    tbs = read_tables(locs, remotes)
+    l = tbs['lineitem']
+    o = tbs['orders']
+
+    l = l[l['l_commitdate'] < l['l_receiptdate']]
+    o = o[(o['o_orderdate'] >= np.datetime64('1993-07-01'))
+          &(o['o_orderdate'] < np.datetime64('1993-10-01'))]
+    t = o.merge(l, left_on='o_orderkey', right_on='l_orderkey')
+    t = t[['o_orderpriority', 'o_orderkey']]
+
+    t = t.groupby('o_orderpriority').count()
+    t.sort_values('o_orderpriority')
+    return t
+def q_05_v1(locs, remotes):
+    tbs = read_tables(locs, remotes)
+    c = tbs['customer']
+    o = tbs['orders']
+    l = tbs['lineitem']
+    s = tbs['supplier']
+    n = tbs['nation']
+    r = tbs['region']
+
+    c = c[['c_custkey', 'c_nationkey']]
+
+    s = s[['s_nationkey', 's_suppkey']]
+    n = n[['n_name', 'n_nationkey', 'n_regionkey']]
+
+    o = o[(o['o_orderdate'] >= np.datetime64('1994-01-01'))
+         &(o['o_orderdate'] < np.datetime64('1995-01-01'))]
+    o = o[['o_orderkey', 'o_custkey']]
+    l = l[['l_suppkey', 'l_orderkey', 'l_discount', 'l_extendedprice']]
+    r = r[r['r_name'] == 'ASIA']
+    r = r[['r_regionkey']]
+
+    t = c.merge(o, left_on='c_custkey', right_on='o_custkey')
+    t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey')
+    t = t.merge(s, left_on=['l_suppkey', 'c_nationkey'], right_on=['s_suppkey', 's_nationkey'])
+    t = t.merge(n, left_on='s_nationkey', right_on='n_nationkey')
+    t = t.merge(r, left_on='n_regionkey', right_on='r_regionkey')
+    t['revenue'] = t['l_extendedprice'] * (1 - t['l_discount'])
+    t = t[['n_name', 'revenue']]
+    t = t.groupby(('n_name'), sort=False).sum()
+    t.reset_index(inplace=True)
+    t.sort_values('revenue', ascending=False)
+
+    return t;
 
 def q_10_v1(locs, remotes):
     tbs = read_tables(locs, remotes)
@@ -214,8 +296,8 @@ def q_13_v1(locs, remotes):
 def q_14_v1(locs, remotes):
     tbs = read_tables(locs, remotes)
     l = tbs['lineitem']
-    l = l[(l['l_shipdate'] >= datetime.datetime(1995, 9, 1))
-         &(l['l_shipdate'] < datetime.datetime(1995, 10, 1))]
+    l = l[(l['l_shipdate'] >= np.datetime64('1995-09-01'))
+         &(l['l_shipdate'] < np.datetime64('1995-10-01'))]
     l = l[['l_partkey', 'l_extendedprice', 'l_discount']]
     p = tbs['part']
     p = p[['p_partkey', 'p_type']]
@@ -224,36 +306,67 @@ def q_14_v1(locs, remotes):
     t['revenue2'] = t['l_extendedprice'] * (1 - t['l_discount'])
     t['revenue1'] = t['revenue2']+5
     # todo: solve unsupported column types
-    t = t.groupby('revenue2').agg({'revenue2': ['sum']})
     t = 100 * t['revenue1'] / t['revenue2']
     return t;
 
 def q_15_v1(locs, remotes):
     tbs = read_tables(locs, remotes)
-    s = tbs['supplier']
-    s = s[['s_suppkey', 's_name', 's_address', 's_phone']]
     l = tbs['lineitem']
-    l = l[(l['l_shipdate'] >= datetime.date(1996, 1, 1))
-         &(l['l_shipdate'] < datetime.date(1996, 4, 1))]
-    l['total_revenue'] = l['l_extendedprice'] * (1 - l['l_discount'])
-    l = l[['l_suppkey', 'total_revenue']]
-    l = l.groupby('l_suppkey').sum(min_count=1)
-    l.reset_index(inplace=True)
+    l = l[['l_partkey', 'l_quantity', 'l_extendedprice']]
+    p = tbs['part']
+    p = p[['p_partkey', 'p_brand', 'p_container']]
 
-    ti = l.agg(max)
+    ti = l.merge(p, left_on='l_partkey', right_on='p_partkey')
+    # todo: having t=ti here cause datasource to be none
+    t = ti
+    ti = ti[['p_partkey', 'l_quantity']].head(200)
+    ti = ti.groupby('p_partkey').mean()
+    ti.reset_index(inplace=True)
+    ti['avg_qty'] = ti['l_quantity'] * 0.2
+    ti = ti[['p_partkey', 'avg_qty']]
 
-    t = s.merge(l, left_on='s_suppkey', right_on='l_suppkey')
-    t = t[t['total_revenue'] == ti['total_revenue']]
-    t = t[['s_suppkey', 's_name', 's_address', 's_phone', 'total_revenue']]
-    t.sort_values('s_suppkey', inplace=True)
+    t = t[(t['p_brand'] == 'Brand#23') & (t['p_container'] == 'MED BOX')]
+    t = t.merge(ti, left_on='p_partkey', right_on='p_partkey')
+    t = t[t['l_quantity'] < t['avg_qty']]
 
+    t = t[['l_extendedprice']]
+    t = t.sum()
+    return t
+
+def q_18_v1(locs, remotes):
+    tbs = read_tables(locs, remotes)
+    c = tbs['customer']
+    l = tbs['lineitem']
+    o = tbs['orders']
+
+    c = c[['c_custkey', 'c_name']]
+    o = o[['o_orderkey', 'o_orderdate', 'o_totalprice', 'o_custkey']]
+    l = l[['l_orderkey', 'l_quantity']]
+
+    ti = l[['l_orderkey', 'l_quantity']]
+    ti = ti.groupby('l_orderkey').sum()
+    ti = ti[ti['l_quantity'] > 300]
+    ti.reset_index(inplace=True)
+
+    t = c.merge(o, left_on='c_custkey', right_on='o_custkey')
+    t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey')
+    t = t.merge(ti['l_orderkey'], left_on='o_orderkey', right_on='l_orderkey')
+    # t = t[t['o_orderkey'].isin(ti['l_orderkey'])]
+
+    t = t[['c_name', 'c_custkey', 'o_orderkey', 'o_orderdate', 'o_totalprice', 'l_quantity']]
+    t = t.groupby(['c_name', 'c_custkey', 'o_orderkey', 'o_orderdate', 'o_totalprice']).sum()
+    t.reset_index(inplace=True)
+    t.sort_values(['o_totalprice', 'o_orderdate'], ascending=[False, True])
+    return t.head(100)
 
 def measure_time(func, *args):
     start = time.time()
     rs = func(*args)
     end = time.time()
+    runtime = end-start
     print(rs)
-    print('Function {} takes time {}'.format(func, end-start))
+    print('Function {} takes time {}'.format(func, runtime))
+    return runtime
 
 
 my_db = Database(db_config['host'], db_config['schema'], db_config['db'], db_config['port'], db_config['user'],
@@ -261,14 +374,27 @@ my_db = Database(db_config['host'], db_config['schema'], db_config['db'], db_con
 
 
 if __name__ == '__main__':
-    full_qry = ['mini_01', 'mini_02', 'mini_03', 'mini_05', 'mini_06', 'q_03_v1', 'q_10_v1', 'q_13_v1']
-    qrys = ['q_14_v1', 'q_15_v1']
-    for q in qrys:
+    output_path = 'tpch_out/sf01_pd.csv'
+    #'mini_01', 'mini_02', 'mini_03', 'mini_05', 'mini_06',
+    full_qry = ['q_02_v1', 'q_03_v1', 'q_04_v1', 'q_05_v1', 'q_10_v1', 'q_13_v1', 'q_14_v1', 'q_18_v1']
+    qrys = ['mini_05']
+
+    out_vecs = []
+    header = ['qid', 'local_tb', 'remote_tb', 'runtime']
+    for q in full_qry:
         try:
             for ls, rs in table_dist[q]:
+                out_vec = [q, ' '.join(ls), ' '.join(rs)]
                 print('----------------------------------------------\n'
                       'test qry {}, locals: {}, remotes: {}\n'
                       '---------------------------------------------'.format(q, ls, rs))
-                measure_time(locals()[q], ls, rs)
+                runtime = measure_time(locals()[q], ls, rs)
+                out_vec.append(runtime)
+                out_vecs.append(out_vec)
         except Exception as e:
             traceback.print_exc()
+
+    with open(output_path, 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(out_vecs)

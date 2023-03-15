@@ -1,3 +1,4 @@
+import csv
 import datetime
 import marshal
 import pickle
@@ -239,8 +240,8 @@ def q_05_v1(locs, remotes):
     s = s[['s_nationkey', 's_suppkey']]
     n = n[['n_name', 'n_nationkey', 'n_regionkey']]
 
-    o = o[(o['o_orderdate'] >= datetime.date(1994, 1, 1))
-         &(o['o_orderdate'] < datetime.date(1995, 1, 1))]
+    o = o[(o['o_orderdate'] >= np.datetime64('1994-01-01'))
+         &(o['o_orderdate'] < np.datetime64('1995-01-01'))]
     o = o[['o_orderkey', 'o_custkey']]
     l = l[['l_suppkey', 'l_orderkey', 'l_discount', 'l_extendedprice']]
     r = r[r['r_name'] == 'ASIA']
@@ -334,18 +335,63 @@ def q_15_v1(locs, remotes):
     ti.reset_index(inplace=True)
     ti['avg_qty'] = ti['l_quantity'] * 0.2
     ti = ti[['p_partkey', 'avg_qty']]
-    ti.materialize()
-    print(ti.data)
 
     t = t[(t['p_brand'] == 'Brand#23') & (t['p_container'] == 'MED BOX')]
     t = t.merge(ti, left_on='p_partkey', right_on='p_partkey')
     t = t[t['l_quantity'] < t['avg_qty']]
-    t.materialize()
-    print(t.data)
+
     t = t[['l_extendedprice']]
     t = t.sum()
     return t
 
+def q_17_v1(locs, remotes):
+    tbs = read_tables(locs, remotes)
+    p = tbs['part']
+    l = tbs['lineitem']
+
+    l = l[['l_partkey', 'l_quantity', 'l_extendedprice']]
+    p = p[['p_partkey', 'p_brand', 'p_container']]
+
+    ti = l.merge(p, left_on='l_partkey', right_on='p_partkey')
+    t = ti
+    ti = ti[['p_partkey', 'l_quantity']]
+    ti = ti.groupby('p_partkey').agg('mean')
+    ti['avg_qty'] = ti['l_quantity'] * 0.2
+    ti.reset_index(inplace=True)
+    ti = ti[['p_partkey', 'avg_qty']]
+
+    t = t[(t['p_brand'] == 'Brand#23') & (t['p_container'] == 'MED BOX')]
+    t = t.merge(ti, left_on='p_partkey', right_on='p_partkey')
+    t = t[t['l_quantity'] < t['avg_qty']]
+    t = t[['l_extendedprice']]
+    t = t.sum()
+    return t['l_extendedprice'] / 7.0
+
+def q_18_v1(locs, remotes):
+    tbs = read_tables(locs, remotes)
+    c = tbs['customer']
+    l = tbs['lineitem']
+    o = tbs['orders']
+
+    c = c[['c_custkey', 'c_name']]
+    o = o[['o_orderkey', 'o_orderdate', 'o_totalprice', 'o_custkey']]
+    l = l[['l_orderkey', 'l_quantity']]
+
+    ti = l[['l_orderkey', 'l_quantity']]
+    ti = ti.groupby('l_orderkey').sum()
+    ti = ti[ti['l_quantity'] > 300]
+    ti.reset_index(inplace=True)
+
+    t = c.merge(o, left_on='c_custkey', right_on='o_custkey')
+    t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey')
+    t = t.merge(ti['l_orderkey'], left_on='o_orderkey', right_on='l_orderkey')
+    # t = t[t['o_orderkey'].isin(ti['l_orderkey'])]
+
+    t = t[['c_name', 'c_custkey', 'o_orderkey', 'o_orderdate', 'o_totalprice', 'l_quantity']]
+    t = t.groupby(['c_name', 'c_custkey', 'o_orderkey', 'o_orderdate', 'o_totalprice']).sum()
+    t.reset_index(inplace=True)
+    t.sort_values(['o_totalprice', 'o_orderdate'], ascending=[False, True])
+    return t.head(100)
 
 def random_01(locs, remotes):
     tbs = read_tables(locs, remotes)
@@ -371,32 +417,41 @@ def measure_time(func, *args):
     start = time.time()
     rs = func(*args)
     # print('func called')
-    print(rs.genSQL)
+    # print(rs.genSQL)
     rs.materialize()
     # print('materialized')
     end = time.time()
+    runtime = end-start
     print(rs.data)
-    print('Function {} takes time {}'.format(func, end-start))
+    print('Function {} takes time {}'.format(func, runtime))
+    return runtime
 
 
 if __name__ == '__main__':
+    output_path = 'tpch_out/sf01_lad.csv'
     connect(db_config['host'], db_config['schema'], db_config['db'], db_config['port'], db_config['user'],
                  db_config['passwd'])
-    full_qry = ['mini_03', 'mini_05', 'mini_06', 'q_02_v1', 'q_03_v1', 'q_04_v1', 'q_05_v1', 'q_10_v1', 'q_13_v1', 'q_14_v1', 'q_15_v1']
-    qrys = ['q_02_v1', 'q_03_v1', 'q_04_v1', 'q_05_v1', 'q_10_v1', 'q_13_v1', 'q_14_v1', 'q_15_v1']
-    for q in qrys:
+    full_qry = ['q_02_v1', 'q_03_v1', 'q_04_v1', 'q_05_v1', 'q_10_v1', 'q_13_v1', 'q_14_v1', 'q_18_v1']
+    qrys = ['q_18_v1']
+
+    out_vecs = []
+    header = ['qid', 'local_tb', 'remote_tb', 'runtime']
+    for q in full_qry:
         for ls, rs in table_dist[q]:
+            out_vec = [q, ' '.join(ls), ' '.join(rs)]
             try:
                 print('\n----------------------------------------------\n'
                       'test qry {}, locals: {}, remotes: {}\n'
                       '---------------------------------------------'.format(q, ls, rs))
-                measure_time(locals()[q], ls, rs)
+                rt = measure_time(locals()[q], ls, rs)
+                out_vec.append(rt)
+                out_vecs.append(out_vec)
             except Exception as e:
                 traceback.print_exc()
 
 
+    with open(output_path, 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(out_vecs)
 
-"""
-SELECT (revenue2/(100-revenue1)) AS revenue1 FROM (SELECT revenue1 FROM (SELECT revenue2 , sum(revenue1) AS revenue1 FROM (SELECT l_partkey AS l_partkey, l_extendedprice AS l_extendedprice, l_discount AS l_discount, p_partkey AS p_partkey, p_type AS p_type, ((1-l_discount)*l_extendedprice) AS revenue2, (5+revenue2) AS revenue1 FROM (SELECT l_partkey AS l_partkey, l_extendedprice AS l_extendedprice, l_discount AS l_discount, p_partkey AS p_partkey, p_type AS p_type, ((1-l_discount)*l_extendedprice) AS revenue2 FROM (SELECT SQLProjectionTransform76.l_partkey AS l_partkey, SQLProjectionTransform76.l_extendedprice AS l_extendedprice, SQLProjectionTransform76.l_discount AS l_discount, SQLProjectionTransform77.p_partkey AS p_partkey, SQLProjectionTransform77.p_type AS p_type FROM (SELECT l_partkey AS l_partkey, l_extendedprice AS l_extendedprice, l_discount AS l_discount FROM (SELECT l_comment AS l_comment, l_commitdate AS l_commitdate, l_discount AS l_discount, l_extendedprice AS l_extendedprice, l_linenumber AS l_linenumber, l_linestatus AS l_linestatus, l_orderkey AS l_orderkey, l_partkey AS l_partkey, l_quantity AS l_quantity, l_receiptdate AS l_receiptdate, l_returnflag AS l_returnflag, l_shipdate AS l_shipdate, l_shipinstruct AS l_shipinstruct, l_shipmode AS l_shipmode, l_suppkey AS l_suppkey, l_tax AS l_tax FROM (SELECT * FROM lineitem) lineitem WHERE (l_shipdate >= '1995-09-01 00:00:00') AND (l_shipdate < '1995-10-01 00:00:00')) SQLProjectionTransform75) SQLProjectionTransform76 INNER JOIN (SELECT p_partkey AS p_partkey, p_type AS p_type FROM (SELECT * FROM part) part) SQLProjectionTransform77 ON SQLProjectionTransform76.l_partkey = SQLProjectionTransform77.p_partkey) SQLJoinTransform78) SQLProjectionTransform83)SQLProjectionTransform86 
-GROUP BY revenue2 ORDER BY revenue2) SQLAGG_Transform88) SQLBinaryOperationTransform90
-"""

@@ -15,8 +15,10 @@ ArrayLike = Union[np.ndarray, list, tuple]
 
 
 
-def in_type(value, expected: typing._GenericAlias) -> bool:
-    return value in expected.__args__
+def in_type(value, expected) -> bool:
+    if hasattr(expected, '__args__'):
+        return value in expected.__args__
+    return value == expected
 
 
 def is_type(value, expected) -> bool:

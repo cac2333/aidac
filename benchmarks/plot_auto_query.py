@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-index_range = [3]
+index_range = [1, 2, 3]
 path = 'auto_gen_queries/'
 lad_prefix = path + 'out_{}.txt'
 pd_prefix = path + 'out_{}_pd.txt'

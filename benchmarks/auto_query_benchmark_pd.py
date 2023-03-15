@@ -79,7 +79,7 @@ def run_one_dist(job, table_list, opath, id, con):
     supplier = dist.supplier if hasattr(dist, 'supplier') else None
 
     # start index, end index and step for iterating the queries
-    sc, ec, step = 2800, 3000, 1
+    sc, ec, step = 0, 3000, 3
     # total query count and number of errors
     idx, err_count = 0, 0
 
@@ -89,7 +89,8 @@ def run_one_dist(job, table_list, opath, id, con):
     all_query_stats = []
 
     # write to result file
-    with open(query_stats_log, 'a') as f:
+    # with open(query_stats_log, 'a') as f:
+    with open(wpath, 'a') as f:
         writer = csv.writer(f)
 
         for cmd in queries:
@@ -101,9 +102,9 @@ def run_one_dist(job, table_list, opath, id, con):
                     table_involved.append(tb)
 
             # check query stats
-            stats = extract_query_meta(cmd)
-            stats.insert(0, indexes[idx])
-            cmd = re.sub(r'^df\d+ = ', '', cmd)
+            # stats = extract_query_meta(cmd)
+            # stats.insert(0, indexes[idx])
+            # cmd = re.sub(r'^df\d+ = ', '', cmd)
 
             try:
                 start = time.time()
@@ -113,9 +114,9 @@ def run_one_dist(job, table_list, opath, id, con):
                 for tb in table_involved:
                     final_cmd += f"""{tb}=pd.read_sql_table('{tb}', con)\n"""
                 final_cmd += cmd
-                # exec(final_cmd)
-                rs = eval(final_cmd)
-                stats.extend(output_size(rs))
+                exec(final_cmd)
+                # rs = eval(final_cmd)
+                # stats.extend(output_size(rs))
                 end = time.time()
                 times[idx] = end - start
                 print(f'time for [{idx}]  = {end - start}')
@@ -123,9 +124,9 @@ def run_one_dist(job, table_list, opath, id, con):
                 print(e)
                 err_count += 1
 
-            all_query_stats.append(stats)
-            # writer.writerow([indexes[idx], times[idx]])
-            writer.writerow(stats)
+            # all_query_stats.append(stats)
+            writer.writerow([indexes[idx], times[idx]])
+            # writer.writerow(stats)
             idx += 1
 
         # with open(query_stats_log, 'w') as qf:
@@ -143,7 +144,7 @@ if __name__ == "__main__":
     con = engine.connect()
 
     query_path = 'auto_gen_queries'
-    for id in [999]:
+    for id in [1, 2, 3]:
         random.seed(id*10)
         run_one_dist('p1', table_list, query_path, id, con)
 

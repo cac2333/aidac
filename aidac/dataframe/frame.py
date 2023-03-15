@@ -382,6 +382,8 @@ class DataFrame:
     def sum(self):
         if hasattr(self, 'transform') and isinstance(self.transform, SQLGroupByTransform):
             proj_cols = self.columns.keys() - self.transform._groupcols_
+        else:
+            proj_cols = self.columns.keys()
         trans = SQLAGG_Transform(self, func='sum', collist=proj_cols, numeric_only=False)
         return DataFrame(ds=self.data_source, transform=trans)
 
@@ -505,7 +507,7 @@ class DataFrame:
             return DataFrame(ds=self.data_source, transform=trans)
         raise ValueError("object comparison (!=) is not supported by remotetables")
 
-    @local_frame_wrapper
+    @binary_op_local_frame_wrapper
     def __lt__(self, other) :
         if is_type(other, ConstantTypes) or is_type(other, DataFrame):
             trans = SQLFilterTransform(self, "lt", other)

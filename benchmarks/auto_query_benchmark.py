@@ -17,7 +17,7 @@ db_config = getattr(config, 'db_config')
 with_materialization = False
 use_existing_meta = True
 
-
+large_rs = [2986, 2981, ]
 # todo
 """# r_comment
 nation.merge(region[region['r_regionkey'] == 2].merge(supplier.merge(region[region['r_regionkey'] > 2][['r_regionkey','r_name','r_comment']].groupby(by=['r_comment']).agg('count').merge(nation[nation['n_nationkey'] < 14][['n_nationkey','n_name','n_regionkey','n_comment']].groupby(by=['n_comment']).agg('max', numeric_only=True),left_on='r_regionkey', right_on='n_regionkey'),left_on='s_nationkey', right_on='n_nationkey'),left_on='r_regionkey', right_on='n_regionkey'),left_on='n_nationkey', right_on='s_nationkey')[['n_regionkey_y','r_comment','r_regionkey_x','s_nationkey','n_nationkey_x','s_name','n_comment','r_name','r_regionkey_y','s_phone','n_regionkey_x']].materialize()
@@ -52,7 +52,7 @@ def run_one_dist(job, table_list, rpath, wpath, wlogpath):
     supplier = dist.supplier
 
     # start index, end index and step for iterating the queries
-    sc, ec, step = 0, 3000, 10
+    sc, ec, step = 0, 3000, 3
     # total query count and number of errors
     idx, err_count = 0, 0
 
@@ -66,6 +66,8 @@ def run_one_dist(job, table_list, rpath, wpath, wlogpath):
     for cmd in queries:
         # append materialize command at the end
         cmd = cmd.rstrip() + '.materialize()'
+        if idx in large_rs:
+            continue
         try:
             start = time.time()
             exec(cmd)
@@ -100,7 +102,7 @@ if __name__ == "__main__":
 
     query_path = 'auto_gen_queries'
 
-    for id in range(3, 4):
+    for id in range(1, 4):
         random.seed(id*10)
         if with_materialization:
             rpath = f'{query_path}/auto_materialization/'

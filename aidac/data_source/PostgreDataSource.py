@@ -7,6 +7,7 @@ from collections import OrderedDict
 
 import numpy as np
 import pandas
+import logging, sys
 
 from aidac.common.DataIterator import generator
 from aidac.common.column import Column
@@ -33,7 +34,6 @@ typeConverter_rev = {'integer': np.int32, 'character varying': np.object, 'doubl
                      }
 
 constant_converter = {'YES': True, 'NO': False}
-
 
 def convert_const(key):
     if key in constant_converter:
@@ -197,9 +197,9 @@ class PostgreDataSource(DataSource):
                 return rs
             self.__conn.commit()
         except psycopg.errors.DatabaseError as err:
-            print(f'An error is thrown when executing the following query:\n{qry}')
-            print(err)
-            print('will rollback shortly...')
+            logging.info(f'An error is thrown when executing the following query:\n{qry}')
+            logging.info(err)
+            logging.info('will rollback shortly...')
             self.__conn.rollback()
 
         return None

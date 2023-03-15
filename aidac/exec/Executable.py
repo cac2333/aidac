@@ -4,6 +4,7 @@ import sys
 
 import pandas as pd
 import numpy as np
+import logging
 
 import time
 import random
@@ -20,6 +21,7 @@ from aidac.exec.utils import *
 from aidac.data_source.DataSourceManager import manager, LOCAL_DS
 
 BOUND1 = 1000
+logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
 def is_local(df1: frame.DataFrame, df2: frame.DataFrame):
     """
@@ -48,8 +50,12 @@ def get_hist(df: frame.DataFrame, col: str):
     if df.data is not None:
         total = len(df.data)
         # todo: handle empty set, same as the groupby part
-        n_null = df.data[col].isnull().sum()
-        n_distinct = len(np.unique(df.data[col].to_numpy()))
+        if isinstance(df.data, pd.Series):
+            n_null = df.data.isnull().sum()
+            n_distinct = len(np.unique(df.data.to_numpy()))
+        else:
+            n_null = df.data[col].isnull().sum()
+            n_distinct = len(np.unique(df.data[col].to_numpy()))
         # assume uniform distribution (no histogram bound, mcv, mcf)
         hist = Histgram(df.table_name, col, n_null/total, n_distinct)
     else:
@@ -145,7 +151,7 @@ class Executable:
             data1 = self.perform_local_operation(sources[0])
             data2 = self.perform_local_operation(sources[1])
             if len(data1) == 0 or len(data2)==0:
-                print(f"perform locally on empty dataset: {df}")
+                logging.debug(f"perform locally on empty dataset: {df}")
             func = getattr(pd.DataFrame, df._saved_func_name_)
             data = func(data1, data2, **df._saved_kwargs_)
         else:
@@ -154,10 +160,10 @@ class Executable:
             else:
                 data = sources.data
             if len(data) == 0:
-                print(f"perform locally on empty dataset: {df}")
+                logging.debug(f"perform locally on empty dataset: {df}")
             func = getattr(data, df._saved_func_name_)
-            # print(df._saved_args_)
-            # print(data.columns)
+            # logging.debug(df._saved_args_)
+            # logging.debug(data.columns)
             # if isinstance(df.transform, SQLProjectionTransform):
             #     data = func(df._saved_args_, **df._saved_kwargs_)
             # else:
@@ -185,20 +191,20 @@ class Executable:
         for x in self.prereqs:
             x.process()
 
-        # print('process, planned job={}'.format(self.planned_job))
+        # logging.debug('process, planned job={}'.format(self.planned_job))
         start = time.time()
         if self.planned_job == LOCAL_DS:
             # local pandas operation
             assert self.to_be_executed_locally(self.df)
             data = self.perform_local_operation(self.df)
-            # print(f'pandas takes time: {time.time()-start}')
+            # logging.debug(f'pandas takes time: {time.time()-start}')
         else:
             # materialize remote table
 
             sql = self.df.genSQL
-            # print('sql generated: \n{}'.format(sql))
+            # logging.debug('sql generated: \n{}'.format(sql))
             ds = manager.get_data_source(self.planned_job)
-            #_print('***************\n'+sql+'\n++**********')
+            #_logging.debug('***************\n'+sql+'\n++**********')
             expl = 'explain analyze ('+sql+')'
             # rs = ds._execute(expl)
 
@@ -207,7 +213,7 @@ class Executable:
             returned = time.time()
             data = rs.to_tb(self.df.columns)
             # get result table and convert to dataframe
-            #_print('sql time = {}, conversion time = {}, total={}'.format(returned-start, time.time()-returned, time.time()-start))
+            #_logging.debug('sql time = {}, conversion time = {}, total={}'.format(returned-start, time.time()-returned, time.time()-start))
             #todo: q10_v1 local: orders
             # SystemError: <built-in function ensure_datetime64ns> returned a result with an error set
             data = pd.DataFrame(data, columns=self.df.columns.keys())
@@ -448,7 +454,7 @@ class RootExecutable(Executable):
 
     def _print_all_path(self, paths):
         for c, p in paths:
-            print(f'cost = {c}, path = \n{p}')
+            logging.debug(f'cost = {c}, path = \n{p}')
 
     def plan(self, jn_cols=[]):
         all_path = self.prereqs[0].plan()
@@ -456,12 +462,12 @@ class RootExecutable(Executable):
         if all_path:
             all_path = self._wrap_return_cost(all_path)
             # self._print_all_path(all_path)
-            # print(f'number of plans: {len(all_path)}')
+            # logging.debug(f'number of plans: {len(all_path)}')
             path, lowest = self._get_lowest_cost_path(all_path)
             self._insert_transfer_block(self, path)
             self.pre_process()
             self.opt_plan = path
-        #_print(f'estimated cost: {lowest}')
+        #_logging.debug(f'estimated cost: {lowest}')
         return path
 
     def process(self):
