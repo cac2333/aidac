@@ -79,7 +79,7 @@ def run_one_dist(job, table_list, opath, id, con):
     supplier = dist.supplier if hasattr(dist, 'supplier') else None
 
     # start index, end index and step for iterating the queries
-    sc, ec, step = 0, 3000, 3
+    sc, ec, step = 0, 3000, 6
     # total query count and number of errors
     idx, err_count = 0, 0
 
@@ -119,12 +119,13 @@ def run_one_dist(job, table_list, opath, id, con):
                 # stats.extend(output_size(rs))
                 end = time.time()
                 times[idx] = end - start
-                print(f'time for [{idx}]  = {end - start}')
+                # print(f'time for [{idx}]  = {end - start}')
             except Exception as e:
                 print(e)
                 err_count += 1
 
             # all_query_stats.append(stats)
+            print([indexes[idx], times[idx]])
             writer.writerow([indexes[idx], times[idx]])
             # writer.writerow(stats)
             idx += 1

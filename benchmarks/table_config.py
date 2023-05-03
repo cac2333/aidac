@@ -90,11 +90,11 @@ db_config = {
 
 # db_config = {
 #     'host': 'localhost',
-#     'port': 6000,
+#     'port': 5566,
 #     'db': 'sf01',
 #     'schema': 'sf01',
-#     'user': 'sf01',
-#     'passwd': 'sf01'
+#     'user': 'xwang223',
+#     'passwd': ''
 # }
 
 large_rs = [2986, 2981, ]

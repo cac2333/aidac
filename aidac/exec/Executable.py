@@ -21,7 +21,7 @@ from aidac.exec.utils import *
 from aidac.data_source.DataSourceManager import manager, LOCAL_DS
 
 BOUND1 = 1000
-logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 
 def is_local(df1: frame.DataFrame, df2: frame.DataFrame):
     """
@@ -72,6 +72,7 @@ def _estimate_col_width(df):
     est_width = 0
     for c in df.columns:
         col = df.columns[c]
+        logging.debug(f'{c} <{col.dtype}>: {col.get_size()}')
         est_width += col.get_size()
     return est_width
 
@@ -202,21 +203,22 @@ class Executable:
             # materialize remote table
 
             sql = self.df.genSQL
-            # logging.debug('sql generated: \n{}'.format(sql))
+            logging.debug('sql generated: \n{}'.format(sql))
             ds = manager.get_data_source(self.planned_job)
             #_logging.debug('***************\n'+sql+'\n++**********')
-            expl = 'explain analyze ('+sql+')'
+            # expl = 'explain analyze ('+sql+')'
             # rs = ds._execute(expl)
-
+            # logging.debug('***************\n'+rs+'\n++**********')
             rs = ds._execute(sql)
 
             returned = time.time()
             data = rs.to_tb(self.df.columns)
             # get result table and convert to dataframe
-            #_logging.debug('sql time = {}, conversion time = {}, total={}'.format(returned-start, time.time()-returned, time.time()-start))
+            logging.debug('sql time = {}, conversion time = {}, total={}'.format(returned-start, time.time()-returned, time.time()-start))
             #todo: q10_v1 local: orders
             # SystemError: <built-in function ensure_datetime64ns> returned a result with an error set
             data = pd.DataFrame(data, columns=self.df.columns.keys())
+            # logging.debug(data)
         self.clear_lineage()
         self.df._data_ = data
         from aidac.data_source.DataSource import local_ds
@@ -578,7 +580,7 @@ class ScheduleExecutable(Executable):
         est_width = 0
 
         cmetas = {}
-        est_width = tbl1.estimated_meta.cwidth + tbl2.estimated_meta.cwidth
+        est_width = _estimate_col_width(self.prev)
         for c in self.prev.columns:
             if c in tbl1.estimated_meta.cmetas:
                 cmetas[c] = tbl1.estimated_meta.cmetas[c]

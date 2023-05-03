@@ -359,6 +359,17 @@ def q_18_v1(locs, remotes):
     t.sort_values(['o_totalprice', 'o_orderdate'], ascending=[False, True])
     return t.head(100)
 
+def misc():
+    tbs = read_tables(['lineitem', 'orders'],[])
+    l = tbs['lineitem']
+    o = tbs['orders']
+
+    start = time.time()
+    df = l.merge(o, right_on='o_orderkey', left_on='l_orderkey')
+    print(df)
+    end = time.time()
+    print(end-start)
+
 def measure_time(func, *args):
     start = time.time()
     rs = func(*args)
@@ -379,22 +390,24 @@ if __name__ == '__main__':
     full_qry = ['q_02_v1', 'q_03_v1', 'q_04_v1', 'q_05_v1', 'q_10_v1', 'q_13_v1', 'q_14_v1', 'q_18_v1']
     qrys = ['mini_05']
 
-    out_vecs = []
-    header = ['qid', 'local_tb', 'remote_tb', 'runtime']
-    for q in full_qry:
-        try:
-            for ls, rs in table_dist[q]:
-                out_vec = [q, ' '.join(ls), ' '.join(rs)]
-                print('----------------------------------------------\n'
-                      'test qry {}, locals: {}, remotes: {}\n'
-                      '---------------------------------------------'.format(q, ls, rs))
-                runtime = measure_time(locals()[q], ls, rs)
-                out_vec.append(runtime)
-                out_vecs.append(out_vec)
-        except Exception as e:
-            traceback.print_exc()
+    # out_vecs = []
+    # header = ['qid', 'local_tb', 'remote_tb', 'runtime']
+    # for q in full_qry:
+    #     try:
+    #         for ls, rs in table_dist[q]:
+    #             out_vec = [q, ' '.join(ls), ' '.join(rs)]
+    #             print('----------------------------------------------\n'
+    #                   'test qry {}, locals: {}, remotes: {}\n'
+    #                   '---------------------------------------------'.format(q, ls, rs))
+    #             runtime = measure_time(locals()[q], ls, rs)
+    #             out_vec.append(runtime)
+    #             out_vecs.append(out_vec)
+    #     except Exception as e:
+    #         traceback.print_exc()
+    #
+    # with open(output_path, 'w') as f:
+    #     writer = csv.writer(f)
+    #     writer.writerow(header)
+    #     writer.writerows(out_vecs)
 
-    with open(output_path, 'w') as f:
-        writer = csv.writer(f)
-        writer.writerow(header)
-        writer.writerows(out_vecs)
+    misc()

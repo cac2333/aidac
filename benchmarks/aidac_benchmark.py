@@ -262,13 +262,15 @@ def q_05_v1(locs, remotes):
 def q_10_v1(locs, remotes):
     tbs = read_tables(locs, remotes)
     c = tbs['customer']
-    c = c[['c_custkey', 'c_nationkey', 'c_name', 'c_acctbal', 'c_address', 'c_phone', 'c_comment']]
     o = tbs['orders']
+    l = tbs['lineitem']
+
+    c = c[['c_custkey', 'c_nationkey', 'c_name', 'c_acctbal', 'c_address', 'c_phone', 'c_comment']]
+
     o = o[(o['o_orderdate'] >= np.datetime64('1993-10-01'))
          &(o['o_orderdate'] < np.datetime64('1994-01-01'))]
     o = o[['o_orderkey', 'o_custkey']]
 
-    l = tbs['lineitem']
     l = l[l['l_returnflag'] == 'R']
     l['revenue'] = l['l_extendedprice'] * (1 - l['l_discount'])
     l = l[['l_orderkey', 'revenue']]
@@ -287,8 +289,9 @@ def q_10_v1(locs, remotes):
 def q_13_v1(locs, remotes):
     tbs = read_tables(locs, remotes)
     c = tbs['customer']
-    c = c[['c_custkey']]
     o = tbs['orders']
+
+    c = c[['c_custkey']]
     o = o[o['o_comment'].str.contains('^.*special.*requests.*$', regex=True)]
     o = o[['o_orderkey', 'o_custkey']]
     t = c.merge(o, left_on='c_custkey', right_on='o_custkey', how='left')
@@ -305,15 +308,18 @@ def q_13_v1(locs, remotes):
 def q_14_v1(locs, remotes):
     tbs = read_tables(locs, remotes)
     l = tbs['lineitem']
+    p = tbs['part']
+
     l = l[(l['l_shipdate'] >= datetime.datetime(1995, 9, 1))
          &(l['l_shipdate'] < datetime.datetime(1995, 10, 1))]
     l = l[['l_partkey', 'l_extendedprice', 'l_discount']]
-    p = tbs['part']
+
     p = p[['p_partkey', 'p_type']]
 
     t = l.merge(p, left_on='l_partkey', right_on='p_partkey')
     t['revenue2'] = t['l_extendedprice'] * (1 - t['l_discount'])
     t['revenue1'] = t['revenue2']+5
+    # t['revenue1'] = t['revenue2'].where(t['p_type'].str.contains('^PROMO.*$'), 0)
     # todo: solve unsupported column types
     t = 100 * t['revenue1'] / t['revenue2']
     # t = pd.DataFrame({'promo_revenue': [t]})
@@ -385,6 +391,7 @@ def q_18_v1(locs, remotes):
     t = c.merge(o, left_on='c_custkey', right_on='o_custkey')
     t = t.merge(l, left_on='o_orderkey', right_on='l_orderkey')
     t = t.merge(ti['l_orderkey'], left_on='o_orderkey', right_on='l_orderkey')
+
     # t = t[t['o_orderkey'].isin(ti['l_orderkey'])]
 
     t = t[['c_name', 'c_custkey', 'o_orderkey', 'o_orderdate', 'o_totalprice', 'l_quantity']]
